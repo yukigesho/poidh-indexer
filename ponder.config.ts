@@ -4,6 +4,9 @@ import PoidhV2ABI from "./abis/PoidhV2Abi";
 import PoidhV2NFTABI from "./abis/PoidhV2NFTAbi";
 
 export default createConfig({
+  database: {
+    kind: "postgres",
+  },
   networks: {
     base: {
       chainId: 8453,

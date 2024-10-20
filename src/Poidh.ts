@@ -1,24 +1,47 @@
 import { ponder } from "@/generated";
-import PoidhV2NFTABI from "../abis/PoidhV2NFTAbi";
-const POIDH_NFT_CONTRACT_ADDRESS = "0xDdfb1A53E7b73Dba09f79FCA24765C593D447a80";
+import { calcId } from "../utils";
 
 ponder.on("PoidhContract:BountyCreated", async ({ event, context }) => {
-  const { Bounty, User } = context.db;
+  const { Bounty, User, ParticipantBounty } = context.db;
   const { id, name, amount, issuer, createdAt, description } = event.args;
 
   const user = await User.upsert({ id: issuer, create: {}, update: {} });
 
+  const isMultiplayer =
+    (
+      await context.client.readContract({
+        abi: context.contracts.PoidhContract.abi,
+        address: context.contracts.PoidhContract.address,
+        functionName: "getParticipants",
+        args: [id],
+      })
+    )[0].length > 0;
+
   await Bounty.create({
-    id: id + BigInt(context.network.chainId),
+    id: calcId({ id, chainId: context.network.chainId }),
     data: {
+      primaryId: id,
+      chainId: BigInt(context.network.chainId),
       title: name,
       description,
-      amount: amount,
+      amount: amount.toString(),
       createdAt,
       inProgress: true,
       isBanned: false,
-      issuerId: user.id,
-      chainId: context.network.chainId,
+      issuer: user.id,
+      isMultiplayer,
+    },
+  });
+
+  await ParticipantBounty.create({
+    id: event.block.number * 100_000n + BigInt(event.log.logIndex),
+    data: {
+      amount: amount.toString(),
+      bountyId: calcId({
+        id,
+        chainId: BigInt(context.network.chainId),
+      }),
+      userId: user.id,
     },
   });
 });
@@ -28,36 +51,47 @@ ponder.on("PoidhContract:BountyCancelled", async ({ event, context }) => {
   const { bountyId } = event.args;
 
   await Bounty.update({
-    id: bountyId + BigInt(context.network.chainId),
+    id: calcId({
+      id: bountyId,
+      chainId: context.network.chainId,
+    }),
     data: {
       inProgress: false,
+      isCanceled: true,
     },
   });
 });
 
 ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
   const { Bounty, User, ParticipantBounty } = context.db;
-  const { amount, participant } = event.args;
-
+  const { amount, participant, bountyId } = event.args;
+  const { client, contracts } = context;
   const user = await User.upsert({ id: participant, create: {}, update: {} });
 
-  const bountyId = event.args.bountyId + BigInt(context.network.chainId);
+  const [_, __, deadline] = await client.readContract({
+    abi: contracts.PoidhContract.abi,
+    address: contracts.PoidhContract.address,
+    functionName: "bountyVotingTracker",
+    args: [bountyId],
+  });
 
   await Bounty.update({
-    id: bountyId,
+    id: calcId({ id: bountyId, chainId: context.network.chainId }),
     data: ({ current }) => ({
-      amount: current.amount + amount,
+      amount: (BigInt(current.amount) + amount).toString(),
       isMultiplayer: true,
-      yes: 0n,
-      no: 0n,
-      deadline: event.block.timestamp,
+      deadline: Number(deadline),
     }),
   });
 
   await ParticipantBounty.create({
     id: event.block.number * 100_000n + BigInt(event.log.logIndex),
     data: {
-      bountyId: bountyId,
+      amount: amount.toString(),
+      bountyId: calcId({
+        id: bountyId,
+        chainId: BigInt(context.network.chainId),
+      }),
       userId: user.id,
     },
   });
@@ -67,14 +101,12 @@ ponder.on(
   "PoidhContract:WithdrawFromOpenBounty",
   async ({ event, context }) => {
     const { Bounty, ParticipantBounty, User } = context.db;
-    const { amount, participant } = event.args;
-
-    const bountyId = event.args.bountyId + BigInt(context.network.chainId);
+    const { amount, participant, bountyId } = event.args;
 
     await Bounty.update({
-      id: bountyId,
+      id: calcId({ id: bountyId, chainId: context.network.chainId }),
       data: ({ current }) => ({
-        amount: current.amount - amount,
+        amount: (BigInt(current.amount) - amount).toString(),
       }),
     });
 
@@ -84,9 +116,11 @@ ponder.on(
       where: { userId: user.id, bountyId: bountyId },
     });
 
-    bounties.forEach(async (bounty) => {
-      await ParticipantBounty.delete({ id: bounty.id });
-    });
+    await Promise.all(
+      bounties.map(async (bounty) => {
+        await ParticipantBounty.delete({ id: bounty.id });
+      })
+    );
   }
 );
 
@@ -95,37 +129,57 @@ ponder.on("PoidhContract:ClaimCreated", async ({ event, context }) => {
   const { bountyId, createdAt, description, id, issuer, name } = event.args;
   const user = await User.upsert({ id: issuer, create: {}, update: {} });
 
-  const url = await context.client.readContract({
-    abi: PoidhV2NFTABI,
-    address: POIDH_NFT_CONTRACT_ADDRESS,
-    functionName: "tokenURI",
-    args: [id],
-  });
-
-  await Claim.create({
-    id: id + BigInt(context.network.chainId),
-    data: {
+  await Claim.upsert({
+    id: calcId({ id, chainId: context.network.chainId }),
+    update: {
+      primaryId: id,
+      chainId: BigInt(context.network.chainId),
       title: name,
-      url: url,
       description: description,
-      bountyId: bountyId + BigInt(context.network.chainId),
+      bountyId: calcId({
+        id: bountyId,
+        chainId: BigInt(context.network.chainId),
+      }),
       createdAt: createdAt,
       isBanned: false,
       issuerId: user.id,
       ownerId: context.contracts.PoidhContract.address,
+      accepted: false,
+    },
+    create: {
+      primaryId: id,
+      chainId: BigInt(context.network.chainId),
+      title: name,
+      url: "",
+      description: description,
+      bountyId: calcId({
+        id: bountyId,
+        chainId: BigInt(context.network.chainId),
+      }),
+      createdAt: createdAt,
+      isBanned: false,
+      issuerId: user.id,
+      ownerId: context.contracts.PoidhContract.address!,
+      accepted: false,
     },
   });
 });
 
 ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
-  const { Bounty } = context.db;
+  const { Bounty, Claim } = context.db;
   const { claimId, bountyId } = event.args;
 
   await Bounty.update({
-    id: bountyId + BigInt(context.network.chainId),
+    id: calcId({ id: bountyId, chainId: context.network.chainId }),
     data: {
-      winnerClaimId: claimId + BigInt(context.network.chainId),
       inProgress: false,
+    },
+  });
+
+  await Claim.update({
+    id: calcId({ id: claimId, chainId: context.network.chainId }),
+    data: {
+      accepted: true,
     },
   });
 });
@@ -134,58 +188,62 @@ ponder.on("PoidhContract:ResetVotingPeriod", async ({ event, context }) => {
   const { Bounty } = context.db;
   const { bountyId } = event.args;
   const { client, contracts } = context;
-
-  const [yesAmount, noAmount, deadline] = await client.readContract({
+  const [_, __, deadline] = await client.readContract({
     abi: contracts.PoidhContract.abi,
     address: contracts.PoidhContract.address,
     functionName: "bountyVotingTracker",
     args: [bountyId],
-    blockNumber: event.block.number + 1n,
   });
 
   await Bounty.update({
-    id: bountyId + BigInt(context.network.chainId),
+    id: calcId({ id: bountyId, chainId: context.network.chainId }),
     data: {
-      yes: yesAmount,
-      no: noAmount,
-      deadline: deadline,
+      deadline: Number(deadline),
+      isVoting: false,
+      inProgress: false,
+    },
+  });
+});
+
+ponder.on("PoidhContract:ClaimSubmittedForVote", async ({ event, context }) => {
+  const { Bounty } = context.db;
+  const { bountyId } = event.args;
+  const { client, contracts } = context;
+
+  const [_, __, deadline] = await client.readContract({
+    abi: contracts.PoidhContract.abi,
+    address: contracts.PoidhContract.address,
+    functionName: "bountyVotingTracker",
+    args: [bountyId],
+    blockNumber: event.block.number,
+  });
+
+  await Bounty.update({
+    id: calcId({ id: bountyId, chainId: context.network.chainId }),
+    data: {
+      isVoting: true,
+      deadline: Number(deadline),
     },
   });
 });
 
 ponder.on("PoidhContract:VoteClaim", async ({ event, context }) => {
-  const { Vote, Bounty } = context.db;
-  const { bountyId, claimId, voter } = event.args;
+  const { Bounty } = context.db;
+  const { bountyId } = event.args;
   const { client, contracts } = context;
 
-  const [yesAmount, noAmount, deadline] = await client.readContract({
+  const [_, __, deadline] = await client.readContract({
     abi: contracts.PoidhContract.abi,
     address: contracts.PoidhContract.address,
     functionName: "bountyVotingTracker",
     args: [bountyId],
-    blockNumber: event.block.number + 1n,
-  });
-
-  const bounty = await Bounty.findUnique({
-    id: bountyId + BigInt(context.network.chainId),
-  });
-
-  await Vote.create({
-    id: voter + event.block.number.toString(),
-    data: {
-      vote: bounty?.yes === yesAmount ? "no" : "yes",
-      claimId: claimId + BigInt(context.network.chainId),
-      bountyId: bountyId + BigInt(context.network.chainId),
-      userId: voter,
-    },
+    blockNumber: event.block.number,
   });
 
   await Bounty.update({
-    id: bountyId + BigInt(context.network.chainId),
+    id: calcId({ id: bountyId, chainId: context.network.chainId }),
     data: {
-      yes: yesAmount,
-      no: noAmount,
-      deadline: deadline,
+      deadline: Number(deadline),
     },
   });
 });
