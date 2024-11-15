@@ -79,7 +79,7 @@ ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
     id: calcId({ id: bountyId, chainId: context.network.chainId }),
     data: ({ current }) => ({
       amount: (BigInt(current.amount) + amount).toString(),
-      isMultiplayer: true,
+      isJoinedBounty: true,
       deadline: Number(deadline),
     }),
   });

@@ -14,6 +14,7 @@ export default createSchema((p) => ({
       issuer: p.string().references("User.id"),
       createdAt: p.bigint(),
       inProgress: p.boolean(),
+      isJoinedBounty: p.boolean().optional(),
       isCanceled: p.boolean().optional(),
       isBanned: p.boolean(),
       isMultiplayer: p.boolean().optional(),
