@@ -103,8 +103,13 @@ ponder.on(
     const { Bounty, ParticipantBounty, User } = context.db;
     const { amount, participant, bountyId } = event.args;
 
+    const dbBountyId = calcId({
+      id: bountyId,
+      chainId: context.network.chainId,
+    });
+
     await Bounty.update({
-      id: calcId({ id: bountyId, chainId: context.network.chainId }),
+      id: dbBountyId,
       data: ({ current }) => ({
         amount: (BigInt(current.amount) - amount).toString(),
       }),
@@ -113,7 +118,7 @@ ponder.on(
     const user = await User.upsert({ id: participant, create: {}, update: {} });
 
     const { items: bounties } = await ParticipantBounty.findMany({
-      where: { userId: user.id, bountyId: bountyId },
+      where: { userId: user.id, bountyId: dbBountyId },
     });
 
     await Promise.all(
