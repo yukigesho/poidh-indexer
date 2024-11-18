@@ -1,37 +1,33 @@
 import { ponder } from "@/generated";
-import { calcId } from "../utils";
+import { claims, users } from "../ponder.schema";
 
 ponder.on("PoidhNFTContract:Transfer", async ({ event, context }) => {
-  const { User, Claim } = context.db;
+  const database = context.db;
   const { to, tokenId } = event.args;
 
-  const receiver = await User.upsert({ id: to, create: {}, update: {} });
+  await database.insert(users).values({ address: to }).onConflictDoNothing();
 
   const url = await context.client.readContract({
     abi: context.contracts.PoidhNFTContract.abi,
     address: context.contracts.PoidhNFTContract.address,
     functionName: "tokenURI",
     args: [tokenId],
-    blockNumber: event.block.number + 1n,
+    blockNumber: event.block.number,
   });
 
-  await Claim.upsert({
-    id: calcId({ id: tokenId, chainId: context.network.chainId }),
-    create: {
-      primaryId: tokenId,
-      chainId: BigInt(context.network.chainId),
+  await database
+    .insert(claims)
+    .values({
+      id: Number(tokenId),
+      chainId: context.network.chainId,
       title: "",
-      url,
       description: "",
-      bountyId: 0n,
-      createdAt: 0n,
-      isBanned: false,
-      issuerId: "",
-      ownerId: receiver.id,
-      accepted: false,
-    },
-    update: {
-      ownerId: receiver.id,
-    },
-  });
+      url,
+      bountyId: 0,
+      owner: to,
+      issuer: to,
+    })
+    .onConflictDoUpdate({
+      owner: to,
+    });
 });
