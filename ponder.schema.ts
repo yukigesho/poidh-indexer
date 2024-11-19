@@ -35,8 +35,8 @@ export const claims = onchainTable(
     url: t.text().notNull(),
     issuer: t.hex().notNull(),
 
-    isBanned: t.boolean(),
-    isAccepted: t.boolean(),
+    isBanned: t.boolean().default(false),
+    isAccepted: t.boolean().default(false),
 
     bountyId: t.integer().notNull(),
     owner: t.hex().notNull(),
@@ -61,7 +61,7 @@ export const users = onchainTable(
 export const participationsBounties = onchainTable(
   "ParticipationsBounties",
   (t) => ({
-    userAddress: t.text().notNull(),
+    userAddress: t.hex().notNull(),
     bountyId: t.integer().notNull(),
     chainId: t.integer().notNull(),
     amount: t.text().notNull(),
