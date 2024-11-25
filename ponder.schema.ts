@@ -73,9 +73,13 @@ export const participationsBounties = onchainTable(
   })
 );
 
-export const bountiesRelations = relations(bounties, ({ many }) => ({
+export const bountiesRelations = relations(bounties, ({ many, one }) => ({
   claims: many(claims),
   participants: many(participationsBounties),
+  issuer: one(users, {
+    fields: [bounties.issuer],
+    references: [users.address],
+  }),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
