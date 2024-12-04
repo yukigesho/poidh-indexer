@@ -14,7 +14,6 @@ export const bounties = onchainTable(
     inProgress: t.boolean().default(true),
     isJoinedBounty: t.boolean().default(false),
     isCanceled: t.boolean().default(false),
-    isBanned: t.boolean().default(false),
     isMultiplayer: t.boolean(),
     isVoting: t.boolean().default(false),
     deadline: t.integer(),
@@ -35,7 +34,6 @@ export const claims = onchainTable(
     url: t.text().notNull(),
     issuer: t.hex().notNull(),
 
-    isBanned: t.boolean().default(false),
     isAccepted: t.boolean().default(false),
 
     bountyId: t.integer().notNull(),
