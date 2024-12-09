@@ -11,14 +11,17 @@ export default createConfig({
     base: {
       chainId: 8453,
       transport: http(process.env.BASE_RPC_URL),
+      pollingInterval: 10000 * 3,
     },
     degen: {
       chainId: 666666666,
       transport: http(process.env.DEGEN_RPC_URL),
+      pollingInterval: 10000 * 3,
     },
     arbitrum: {
       chainId: 42161,
       transport: http(process.env.ARBITRUM_RPC_URL),
+      pollingInterval: 10000 * 3,
     },
   },
   contracts: {
