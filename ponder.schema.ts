@@ -48,8 +48,8 @@ export const users = onchainTable(
   "Users",
   (t) => ({
     address: t.hex().notNull(),
-    ens: t.text(),
-    degenName: t.text(),
+    farcaster: t.text(),
+    twitter: t.text(),
   }),
   (table) => ({
     pk: primaryKey({ columns: [table.address] }),
