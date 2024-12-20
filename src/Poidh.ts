@@ -5,6 +5,7 @@ import {
   participationsBounties,
   users,
 } from "../ponder.schema";
+import { formatEther } from "viem";
 
 ponder.on("PoidhContract:BountyCreated", async ({ event, context }) => {
   const database = context.db;
@@ -31,6 +32,7 @@ ponder.on("PoidhContract:BountyCreated", async ({ event, context }) => {
     title: name,
     description: description,
     amount: amount.toString(),
+    amountSort: Number(formatEther(amount)),
     issuer,
     isMultiplayer,
   });
@@ -82,6 +84,7 @@ ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
     })
     .set((raw) => ({
       amount: (BigInt(raw.amount) + amount).toString(),
+      amountSort: Number(formatEther(BigInt(raw.amount) + amount)),
       isJoinedBounty: true,
       deadline: Number(deadline),
     }));
@@ -107,6 +110,7 @@ ponder.on(
       })
       .set((raw) => ({
         amount: (BigInt(raw.amount) - amount).toString(),
+        amountSort: Number(formatEther(BigInt(raw.amount) - amount)),
       }));
 
     await database.delete(participationsBounties, {
