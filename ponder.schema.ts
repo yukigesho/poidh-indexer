@@ -9,6 +9,7 @@ export const bounties = onchainTable(
     title: t.text().notNull(),
     description: t.text().notNull(),
     amount: t.text().notNull(),
+    amountSort: t.real().notNull(),
     issuer: t.hex().notNull(),
 
     inProgress: t.boolean().default(true),
