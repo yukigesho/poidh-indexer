@@ -3,7 +3,7 @@ import {
   onchainTable,
   primaryKey,
   relations,
-} from "@ponder/core";
+} from "ponder";
 
 export const bounties = onchainTable(
   "Bounties",

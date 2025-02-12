@@ -11,15 +11,15 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@ponder/core": "^0.7.14",
-    "hono": "^4.5.0",
-    "viem": "^2.21.3"
+    "hono": "^4.7.0",
+    "ponder": "^0.9.7",
+    "viem": "^2.23.1"
   },
   "devDependencies": {
-    "@types/node": "^20.9.0",
-    "eslint": "^8.53.0",
-    "eslint-config-ponder": "^0.6.3",
-    "typescript": "^5.2.2"
+    "@types/node": "^20.17.17",
+    "eslint": "^8.57.1",
+    "eslint-config-ponder": "^0.6.26",
+    "typescript": "^5.7.3"
   },
   "engines": {
     "node": ">=18.14"
