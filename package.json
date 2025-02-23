@@ -11,9 +11,14 @@
     "typecheck": "tsc"
   },
   "dependencies": {
+    "@hono/zod-openapi": "^0.18.4",
+    "@hono/zod-validator": "^0.4.3",
     "hono": "^4.7.0",
+    "hono-openapi": "^0.4.5",
     "ponder": "^0.9.7",
-    "viem": "^2.23.1"
+    "viem": "^2.23.1",
+    "zod": "^3.24.2",
+    "zod-openapi": "^4.2.3"
   },
   "devDependencies": {
     "@types/node": "^20.17.17",
