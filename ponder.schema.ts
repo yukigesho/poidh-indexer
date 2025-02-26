@@ -1,5 +1,4 @@
 import {
-  index,
   onchainTable,
   primaryKey,
   relations,
