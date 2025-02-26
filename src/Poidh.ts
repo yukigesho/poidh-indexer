@@ -138,6 +138,11 @@ ponder.on(
           BigInt(raw.amount) + amount
         ).toString(),
         isJoinedBounty: true,
+        amountSort: Number(
+          formatEther(
+            BigInt(raw.amount) + amount,
+          ),
+        ),
         deadline: Number(deadline),
       }));
 
@@ -181,6 +186,11 @@ ponder.on(
         amount: (
           BigInt(raw.amount) - amount
         ).toString(),
+        amountSort: Number(
+          formatEther(
+            BigInt(raw.amount) - amount,
+          ),
+        ),
       }));
 
     await database.delete(
