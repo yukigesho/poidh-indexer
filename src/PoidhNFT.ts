@@ -29,7 +29,7 @@ ponder.on(
       .insert(claims)
       .values({
         id: Number(tokenId),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
         title: "",
         description: "",
         url,

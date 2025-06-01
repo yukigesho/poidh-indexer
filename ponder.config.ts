@@ -8,27 +8,25 @@ export default createConfig({
   database: {
     kind: "postgres",
   },
-  networks: {
+  chains: {
     base: {
-      chainId: 8453,
-      transport: http(process.env.BASE_RPC_URL),
+      id: 8453,
+      rpc: http(process.env.BASE_RPC_URL),
     },
     degen: {
-      chainId: 666666666,
-      transport: http(process.env.DEGEN_RPC_URL),
+      id: 666666666,
+      rpc: http(process.env.DEGEN_RPC_URL),
     },
     arbitrum: {
-      chainId: 42161,
-      transport: http(
-        process.env.ARBITRUM_RPC_URL,
-      ),
+      id: 42161,
+      rpc: http(process.env.ARBITRUM_RPC_URL),
       pollingInterval: 10_000,
     },
   },
   contracts: {
     PoidhContract: {
       abi: PoidhV2ABI,
-      network: {
+      chain: {
         base: {
           address:
             "0xb502c5856F7244DccDd0264A541Cc25675353D39",
@@ -48,7 +46,7 @@ export default createConfig({
     },
     PoidhNFTContract: {
       abi: PoidhV2NFTABI,
-      network: {
+      chain: {
         base: {
           address:
             "0xDdfb1A53E7b73Dba09f79FCA24765C593D447a80",

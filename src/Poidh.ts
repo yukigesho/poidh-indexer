@@ -43,7 +43,7 @@ ponder.on(
 
     await database.insert(bounties).values({
       id: Number(id),
-      chainId: context.network.chainId,
+      chainId: context.chain.id,
       title: name,
       description: description,
       amount: amount.toString(),
@@ -58,7 +58,7 @@ ponder.on(
         userAddress: issuer,
         bountyId: Number(id),
         amount: amount.toString(),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
       });
 
     await database.insert(transactions).values({
@@ -67,7 +67,7 @@ ponder.on(
       address: issuer,
       bountyId: Number(id),
       action: `bounty created`,
-      chainId: context.network.chainId,
+      chainId: context.chain.id,
       timestamp,
     });
   },
@@ -85,7 +85,7 @@ ponder.on(
     await database
       .update(bounties, {
         id: Number(bountyId),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
       })
       .set({
         isCanceled: true,
@@ -98,7 +98,7 @@ ponder.on(
       address: issuer,
       bountyId: Number(bountyId),
       action: `bounty canceled`,
-      chainId: context.network.chainId,
+      chainId: context.chain.id,
       timestamp,
     });
   },
@@ -131,7 +131,7 @@ ponder.on(
     await database
       .update(bounties, {
         id: Number(bountyId),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
       })
       .set((raw) => ({
         amount: (
@@ -152,7 +152,7 @@ ponder.on(
         userAddress: participant,
         bountyId: Number(bountyId),
         amount: amount.toString(),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
       });
 
     await database.insert(transactions).values({
@@ -160,8 +160,8 @@ ponder.on(
       tx: hash,
       address: participant,
       bountyId: Number(bountyId),
-      action: `+${formatEther(amount)} ${context.network.name === "degen" ? "degen" : "eth"}`,
-      chainId: context.network.chainId,
+      action: `+${formatEther(amount)} ${context.chain.name === "degen" ? "degen" : "eth"}`,
+      chainId: context.chain.id,
       timestamp,
     });
   },
@@ -180,7 +180,7 @@ ponder.on(
     await database
       .update(bounties, {
         id: Number(bountyId),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
       })
       .set((raw) => ({
         amount: (
@@ -198,7 +198,7 @@ ponder.on(
       {
         bountyId: Number(bountyId),
         userAddress: participant,
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
       },
     );
 
@@ -207,8 +207,8 @@ ponder.on(
       tx: hash,
       address: participant,
       bountyId: Number(bountyId),
-      action: `-${formatEther(amount)} ${context.network.name === "degen" ? "degen" : "eth"}`,
-      chainId: context.network.chainId,
+      action: `-${formatEther(amount)} ${context.chain.name === "degen" ? "degen" : "eth"}`,
+      chainId: context.chain.id,
       timestamp,
     });
   },
@@ -238,7 +238,7 @@ ponder.on(
       .insert(claims)
       .values({
         id: Number(id),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
         title: name,
         description,
         url: "",
@@ -261,7 +261,7 @@ ponder.on(
       address: issuer,
       bountyId: Number(bountyId),
       action: "claim created",
-      chainId: context.network.chainId,
+      chainId: context.chain.id,
       timestamp,
     });
   },
@@ -280,7 +280,7 @@ ponder.on(
     await database
       .update(claims, {
         id: Number(claimId),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
       })
       .set({
         isAccepted: true,
@@ -289,7 +289,7 @@ ponder.on(
     await database
       .update(bounties, {
         id: Number(bountyId),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
       })
       .set({
         inProgress: false,
@@ -301,7 +301,7 @@ ponder.on(
       address: claimIssuer,
       bountyId: Number(bountyId),
       action: "claim accepted",
-      chainId: context.network.chainId,
+      chainId: context.chain.id,
       timestamp,
     });
   },
@@ -328,7 +328,7 @@ ponder.on(
     await database
       .update(bounties, {
         id: Number(bountyId),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
       })
       .set({
         deadline: Number(deadline),
@@ -342,7 +342,7 @@ ponder.on(
       address: "0x0",
       bountyId: Number(bountyId),
       action: "voting reset period",
-      chainId: context.network.chainId,
+      chainId: context.chain.id,
       timestamp,
     });
   },
@@ -370,7 +370,7 @@ ponder.on(
     await database
       .update(bounties, {
         id: Number(bountyId),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
       })
       .set({
         isVoting: true,
@@ -383,7 +383,7 @@ ponder.on(
       address: "0x0",
       bountyId: Number(bountyId),
       action: `${claimId} submitted for vote`,
-      chainId: context.network.chainId,
+      chainId: context.chain.id,
       timestamp,
     });
   },
@@ -412,7 +412,7 @@ ponder.on(
     await database
       .update(bounties, {
         id: Number(bountyId),
-        chainId: context.network.chainId,
+        chainId: context.chain.id,
       })
       .set({
         deadline: Number(deadline),
@@ -424,7 +424,7 @@ ponder.on(
       address: voter,
       bountyId: Number(bountyId),
       action: `voted`,
-      chainId: context.network.chainId,
+      chainId: context.chain.id,
       timestamp,
     });
   },
