@@ -20,7 +20,6 @@ export default createConfig({
     arbitrum: {
       id: 42161,
       rpc: http(process.env.ARBITRUM_RPC_URL),
-      pollingInterval: 10_000,
     },
   },
   contracts: {
