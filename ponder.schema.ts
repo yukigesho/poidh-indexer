@@ -63,6 +63,45 @@ export const users = onchainTable(
   }),
 );
 
+export const degenBoard = onchainTable(
+  "DegenBoard",
+  (t) => ({
+    address: t.hex().notNull(),
+    earned: t.real().default(0),
+    paid: t.real().default(0),
+    nfts: t.real().default(0),
+  }),
+  (table) => ({
+    pk: primaryKey({ columns: [table.address] }),
+  }),
+);
+
+export const baseBoard = onchainTable(
+  "BaseBoard",
+  (t) => ({
+    address: t.hex().notNull(),
+    earned: t.real().default(0),
+    paid: t.real().default(0),
+    nfts: t.real().default(0),
+  }),
+  (table) => ({
+    pk: primaryKey({ columns: [table.address] }),
+  }),
+);
+
+export const arbitrumBoard = onchainTable(
+  "ArbitrumBoard",
+  (t) => ({
+    address: t.hex().notNull(),
+    earned: t.real().default(0),
+    paid: t.real().default(0),
+    nfts: t.real().default(0),
+  }),
+  (table) => ({
+    pk: primaryKey({ columns: [table.address] }),
+  }),
+);
+
 export const participationsBounties =
   onchainTable(
     "ParticipationsBounties",
@@ -120,11 +159,23 @@ export const bountiesRelations = relations(
 
 export const usersRelations = relations(
   users,
-  ({ many }) => ({
+  ({ many, one }) => ({
     bounties: many(bounties),
     claims: many(claims),
     participations: many(participationsBounties),
     transactions: many(transactions),
+    degenScore: one(degenBoard, {
+      fields: [users.address],
+      references: [degenBoard.address],
+    }),
+    baseScore: one(baseBoard, {
+      fields: [users.address],
+      references: [baseBoard.address],
+    }),
+    arbitrumScore: one(arbitrumBoard, {
+      fields: [users.address],
+      references: [arbitrumBoard.address],
+    }),
   }),
 );
 
@@ -173,6 +224,36 @@ export const transactionRelations = relations(
     bounties: one(bounties, {
       fields: [transactions.bountyId],
       references: [bounties.id],
+    }),
+  }),
+);
+
+export const degenScoreRelations = relations(
+  degenBoard,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [degenBoard.address],
+      references: [users.address],
+    }),
+  }),
+);
+
+export const baseScoreRelations = relations(
+  baseBoard,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [baseBoard.address],
+      references: [users.address],
+    }),
+  }),
+);
+
+export const arbitrumScoreRelations = relations(
+  arbitrumBoard,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [arbitrumBoard.address],
+      references: [users.address],
     }),
   }),
 );
