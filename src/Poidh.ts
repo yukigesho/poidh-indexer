@@ -5,8 +5,10 @@ import {
   participationsBounties,
   users,
   transactions,
+  leaderboard,
 } from "../ponder.schema";
 import { formatEther } from "viem";
+import { sql } from "ponder";
 
 ponder.on(
   "PoidhContract:BountyCreated",
@@ -271,11 +273,13 @@ ponder.on(
   "PoidhContract:ClaimAccepted",
   async ({ event, context }) => {
     const database = context.db;
-    const { claimId, bountyId, claimIssuer } =
-      event.args;
+    const { claimId, claimIssuer } = event.args;
     const { hash, transactionIndex } =
       event.transaction;
     const { timestamp } = event.block;
+
+    const bountyId = Number(event.args.bountyId);
+    const chainId = context.chain.id;
 
     await database
       .update(claims, {
@@ -286,10 +290,10 @@ ponder.on(
         isAccepted: true,
       });
 
-    await database
+    const bounty = await database
       .update(bounties, {
-        id: Number(bountyId),
-        chainId: context.chain.id,
+        id: bountyId,
+        chainId,
       })
       .set({
         inProgress: false,
@@ -299,11 +303,63 @@ ponder.on(
       index: transactionIndex,
       tx: hash,
       address: claimIssuer,
-      bountyId: Number(bountyId),
+      bountyId,
       action: "claim accepted",
-      chainId: context.chain.id,
+      chainId,
       timestamp,
     });
+
+    const participations =
+      await database.sql.query.participationsBounties.findMany(
+        {
+          where: (table, { and, eq }) =>
+            and(
+              eq(table.bountyId, bountyId),
+              eq(table.chainId, chainId),
+            ),
+        },
+      );
+    await database.sql
+      .insert(leaderboard)
+      .values({
+        address: claimIssuer,
+        chainId,
+        earned: bounty.amountSort,
+      })
+      .onConflictDoUpdate({
+        target: [
+          leaderboard.address,
+          leaderboard.chainId,
+        ],
+        set: {
+          earned: sql`${leaderboard.earned} + ${bounty.amountSort}`,
+        },
+      });
+    await Promise.all(
+      participations.map(async (p) => {
+        const paid = Number(
+          formatEther(BigInt(p.amount)),
+        );
+        return database.sql
+          .insert(leaderboard)
+          .values({
+            address: p.userAddress,
+            chainId,
+            paid: Number(
+              formatEther(BigInt(p.amount)),
+            ),
+          })
+          .onConflictDoUpdate({
+            target: [
+              leaderboard.address,
+              leaderboard.chainId,
+            ],
+            set: {
+              paid: sql`${leaderboard.paid} + ${paid}`,
+            },
+          });
+      }),
+    );
   },
 );
 

@@ -1,4 +1,5 @@
 import {
+  index,
   onchainTable,
   primaryKey,
   relations,
@@ -27,6 +28,7 @@ export const bounties = onchainTable(
     pk: primaryKey({
       columns: [table.id, table.chainId],
     }),
+    chain_idx: index().on(table.chainId),
   }),
 );
 
@@ -50,6 +52,9 @@ export const claims = onchainTable(
     pk: primaryKey({
       columns: [table.id, table.chainId],
     }),
+    chain_idx: index().on(table.chainId),
+    bounty_idx: index().on(table.bountyId),
+    owner_idx: index().on(table.owner),
   }),
 );
 
@@ -63,42 +68,21 @@ export const users = onchainTable(
   }),
 );
 
-export const degenBoard = onchainTable(
-  "DegenBoard",
+export const leaderboard = onchainTable(
+  "Leaderboard",
   (t) => ({
     address: t.hex().notNull(),
+    chainId: t.integer().notNull(),
     earned: t.real().default(0),
     paid: t.real().default(0),
     nfts: t.real().default(0),
   }),
   (table) => ({
-    pk: primaryKey({ columns: [table.address] }),
-  }),
-);
-
-export const baseBoard = onchainTable(
-  "BaseBoard",
-  (t) => ({
-    address: t.hex().notNull(),
-    earned: t.real().default(0),
-    paid: t.real().default(0),
-    nfts: t.real().default(0),
-  }),
-  (table) => ({
-    pk: primaryKey({ columns: [table.address] }),
-  }),
-);
-
-export const arbitrumBoard = onchainTable(
-  "ArbitrumBoard",
-  (t) => ({
-    address: t.hex().notNull(),
-    earned: t.real().default(0),
-    paid: t.real().default(0),
-    nfts: t.real().default(0),
-  }),
-  (table) => ({
-    pk: primaryKey({ columns: [table.address] }),
+    pk: primaryKey({
+      columns: [table.address, table.chainId],
+    }),
+    address_idx: index().on(table.address),
+    chain_idx: index().on(table.chainId),
   }),
 );
 
@@ -164,18 +148,7 @@ export const usersRelations = relations(
     claims: many(claims),
     participations: many(participationsBounties),
     transactions: many(transactions),
-    degenScore: one(degenBoard, {
-      fields: [users.address],
-      references: [degenBoard.address],
-    }),
-    baseScore: one(baseBoard, {
-      fields: [users.address],
-      references: [baseBoard.address],
-    }),
-    arbitrumScore: one(arbitrumBoard, {
-      fields: [users.address],
-      references: [arbitrumBoard.address],
-    }),
+    score: many(leaderboard),
   }),
 );
 
@@ -228,31 +201,11 @@ export const transactionRelations = relations(
   }),
 );
 
-export const degenScoreRelations = relations(
-  degenBoard,
+export const leaderboardRelations = relations(
+  leaderboard,
   ({ one }) => ({
     user: one(users, {
-      fields: [degenBoard.address],
-      references: [users.address],
-    }),
-  }),
-);
-
-export const baseScoreRelations = relations(
-  baseBoard,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [baseBoard.address],
-      references: [users.address],
-    }),
-  }),
-);
-
-export const arbitrumScoreRelations = relations(
-  arbitrumBoard,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [arbitrumBoard.address],
+      fields: [leaderboard.address],
       references: [users.address],
     }),
   }),
