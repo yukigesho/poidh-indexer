@@ -23,6 +23,7 @@ export const bounties = onchainTable(
     isMultiplayer: t.boolean(),
     isVoting: t.boolean().default(false),
     deadline: t.integer(),
+    location: t.text(),
   }),
   (table) => ({
     pk: primaryKey({
