@@ -47,6 +47,7 @@ ponder.on(
       id: Number(id),
       chainId: context.chain.id,
       title: name,
+      createdAt: timestamp,
       description: description,
       amount: amount.toString(),
       amountSort: Number(formatEther(amount)),
