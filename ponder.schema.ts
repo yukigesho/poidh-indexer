@@ -11,6 +11,7 @@ export const bounties = onchainTable(
     id: t.integer().notNull(),
     chainId: t.integer().notNull(),
 
+    createdAt: t.bigint().notNull(),
     title: t.text().notNull(),
     description: t.text().notNull(),
     amount: t.text().notNull(),
