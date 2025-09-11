@@ -24,8 +24,8 @@ importers:
         specifier: ^0.4.5
         version: 0.4.5(@hono/zod-validator@0.4.3(hono@4.7.0)(zod@3.24.2))(hono@4.7.0)(zod-openapi@4.2.3(zod@3.24.2))(zod@3.24.2)
       ponder:
-        specifier: ^0.12.0
-        version: 0.12.0(@opentelemetry/api@1.9.0)(@types/node@20.17.17)(better-sqlite3@11.3.0)(hono@4.7.0)(typescript@5.7.3)(viem@2.23.1(typescript@5.7.3)(zod@3.24.2))(zod@3.24.2)
+        specifier: ^0.12.22
+        version: 0.12.22(@opentelemetry/api@1.9.0)(@types/node@20.17.17)(better-sqlite3@11.3.0)(hono@4.7.0)(typescript@5.7.3)(viem@2.23.1(typescript@5.7.3)(zod@3.24.2))(zod@3.24.2)
       viem:
         specifier: ^2.23.1
         version: 2.23.1(typescript@5.7.3)(zod@3.24.2)
@@ -371,8 +371,8 @@ packages:
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
 
-  '@ponder/utils@0.2.10':
-    resolution: {integrity: sha512-h9y+L+dUEOkLn0oh0GECJ1kWJNzrFtLoMPODR7NsvqGcovq5ZaGFvFxb7+iDOUN6f6xn2M+cUoYjkmMsskw8+A==}
+  '@ponder/utils@0.2.12':
+    resolution: {integrity: sha512-pIlunpEoXXJlqSucidJl4r4s66DOnPRbqPY3lZ02uhBr6e2GYK7iNRg4IW7v4WnIhVoSugnWIRiEQYWA0yNLiw==}
     peerDependencies:
       typescript: '>=5.0.4'
       viem: '>=2'
@@ -1475,8 +1475,8 @@ packages:
     resolution: {integrity: sha512-ip4qdzjkAyDDZklUaZkcRFb2iA118H9SgRh8yzTkSQK8HilsOJF7rSY8HoW5+I0M46AZgX/pxbprf2vvzQCE0Q==}
     hasBin: true
 
-  ponder@0.12.0:
-    resolution: {integrity: sha512-ouAYqzZrjIgUBb43OiOB1iYoL1KabYDce9u545oPNECaXc9rSZHryymwvn8c26ymWNTMRF1dPsIQvERODDs/nw==}
+  ponder@0.12.22:
+    resolution: {integrity: sha512-YrPns9KDiObcjxHLwbkXL+01SZqvD3J2IZImtSvInJK+wzUgTI6C7NntaCx59bTNZ6FqohdlzQASaY9R8BD+EQ==}
     engines: {node: '>=18.14'}
     hasBin: true
     peerDependencies:
@@ -1861,6 +1861,18 @@ packages:
       utf-8-validate:
         optional: true
 
+  ws@8.18.3:
+    resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
@@ -2156,7 +2168,7 @@ snapshots:
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
-  '@ponder/utils@0.2.10(typescript@5.7.3)(viem@2.23.1(typescript@5.7.3)(zod@3.24.2))':
+  '@ponder/utils@0.2.12(typescript@5.7.3)(viem@2.23.1(typescript@5.7.3)(zod@3.24.2))':
     dependencies:
       viem: 2.23.1(typescript@5.7.3)(zod@3.24.2)
     optionalDependencies:
@@ -3148,7 +3160,7 @@ snapshots:
       sonic-boom: 3.8.1
       thread-stream: 2.7.0
 
-  ponder@0.12.0(@opentelemetry/api@1.9.0)(@types/node@20.17.17)(better-sqlite3@11.3.0)(hono@4.7.0)(typescript@5.7.3)(viem@2.23.1(typescript@5.7.3)(zod@3.24.2))(zod@3.24.2):
+  ponder@0.12.22(@opentelemetry/api@1.9.0)(@types/node@20.17.17)(better-sqlite3@11.3.0)(hono@4.7.0)(typescript@5.7.3)(viem@2.23.1(typescript@5.7.3)(zod@3.24.2))(zod@3.24.2):
     dependencies:
       '@babel/code-frame': 7.26.2
       '@commander-js/extra-typings': 12.1.0(commander@12.1.0)
@@ -3157,7 +3169,7 @@ snapshots:
       '@escape.tech/graphql-armor-max-depth': 2.4.0
       '@escape.tech/graphql-armor-max-tokens': 2.5.0
       '@hono/node-server': 1.13.3(hono@4.7.0)
-      '@ponder/utils': 0.2.10(typescript@5.7.3)(viem@2.23.1(typescript@5.7.3)(zod@3.24.2))
+      '@ponder/utils': 0.2.12(typescript@5.7.3)(viem@2.23.1(typescript@5.7.3)(zod@3.24.2))
       abitype: 0.10.3(typescript@5.7.3)(zod@3.24.2)
       ansi-escapes: 7.0.0
       commander: 12.1.0
@@ -3187,6 +3199,7 @@ snapshots:
       vite: 5.0.7(@types/node@20.17.17)
       vite-node: 1.0.2(@types/node@20.17.17)
       vite-tsconfig-paths: 4.3.1(typescript@5.7.3)(vite@5.0.7(@types/node@20.17.17))
+      ws: 8.18.3
     optionalDependencies:
       typescript: 5.7.3
     transitivePeerDependencies:
@@ -3207,6 +3220,7 @@ snapshots:
       - '@vercel/postgres'
       - '@xata.io/client'
       - better-sqlite3
+      - bufferutil
       - bun-types
       - expo-sqlite
       - gel
@@ -3224,6 +3238,7 @@ snapshots:
       - sugarss
       - supports-color
       - terser
+      - utf-8-validate
       - zod
 
   postcss@8.5.2:
@@ -3590,6 +3605,8 @@ snapshots:
   wrappy@1.0.2: {}
 
   ws@8.18.0: {}
+
+  ws@8.18.3: {}
 
   xtend@4.0.2: {}
 
