@@ -8,14 +8,18 @@
     "start": "ponder start",
     "codegen": "ponder codegen",
     "lint": "eslint .",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "update-price": "tsx ./src/cron/updatePrice.ts"
   },
   "dependencies": {
     "@hono/swagger-ui": "^0.5.0",
     "@hono/zod-openapi": "^0.18.4",
     "@hono/zod-validator": "^0.4.3",
+    "dotenv": "^17.2.2",
+    "drizzle-orm": "0.41.0",
     "hono": "^4.7.0",
     "hono-openapi": "^0.4.5",
+    "pg": "^8.16.3",
     "ponder": "^0.12.22",
     "viem": "^2.23.1",
     "zod": "^3.24.2",
@@ -23,8 +27,10 @@
   },
   "devDependencies": {
     "@types/node": "^20.17.17",
+    "@types/pg": "^8.15.5",
     "eslint": "^8.57.1",
     "eslint-config-ponder": "^0.6.26",
+    "tsx": "^4.20.5",
     "typescript": "^5.7.3"
   },
   "engines": {
