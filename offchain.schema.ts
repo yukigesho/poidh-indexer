@@ -14,7 +14,7 @@ export const offchainSchema =
     : null;
 
 export const priceTable = offchainSchema
-  ? offchainSchema.table("price", {
+  ? offchainSchema.table("Price", {
       id: serial().primaryKey(),
       created_at: timestamp().defaultNow(),
       degen_usd: numeric({
@@ -26,7 +26,7 @@ export const priceTable = offchainSchema
         scale: 8,
       }).notNull(),
     })
-  : pgTable("price", {
+  : pgTable("Price", {
       id: serial().primaryKey(),
       created_at: timestamp().defaultNow(),
       degen_usd: numeric({
