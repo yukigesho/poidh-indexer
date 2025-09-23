@@ -8,14 +8,14 @@ import {
   leaderboard,
 } from "../ponder.schema";
 import { formatEther } from "viem";
-import { sql } from "ponder";
+import { desc, sql } from "ponder";
 import offchainDatabase from "../offchain.database";
 import { priceTable } from "../offchain.schema";
 
 const [price] = await offchainDatabase
   .select()
   .from(priceTable)
-  .orderBy(priceTable.id)
+  .orderBy(desc(priceTable.id))
   .limit(1);
 
 ponder.on(
