@@ -157,7 +157,7 @@ app.post("/updatePrice", async (c) => {
     );
 
     exec(
-      `RAILWAY_TOKEN=${RAILWAY_TOKEN} railway redeploy --service ${SERVICE_ID} --yes`,
+      `RAILWAY_TOKEN=${RAILWAY_TOKEN} pnpm redeploy --service ${SERVICE_ID} --yes`,
       (error, stdout, stderr) => {
         if (error) {
           console.error(
