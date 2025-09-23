@@ -9,6 +9,7 @@ import database from "../../offchain.database";
 import { priceTable } from "../../offchain.schema";
 import { fetchPrice } from "../helpers/price";
 import crypto from "crypto";
+import { exec } from "child_process";
 
 const app = new Hono();
 
@@ -18,6 +19,8 @@ app.use("/graphql", graphql({ db, schema }));
 
 const API_KEY = process.env.SERVER_API_KEY;
 const API_SECRET = process.env.SERVER_SECRET;
+const RAILWAY_TOKEN = process.env.RAILWAY_TOKEN;
+const SERVICE_ID = process.env.RAILWAY_SERVICE_ID;
 
 app.get(
   "/swagger",
@@ -57,6 +60,12 @@ app.post("/updatePrice", async (c) => {
   if (!API_KEY || !API_SECRET) {
     return c.json({
       error: "API key or API secret is missing",
+    });
+  }
+
+  if (!RAILWAY_TOKEN || !SERVICE_ID) {
+    return c.json({
+      error: "Server needs configuration",
     });
   }
 
@@ -146,7 +155,23 @@ app.post("/updatePrice", async (c) => {
     console.log(
       "Server will be restarted in 5 seconds",
     );
-    process.exit(-1);
+
+    exec(
+      `RAILWAY_TOKEN=${RAILWAY_TOKEN} railway redeploy --service ${SERVICE_ID} --yes`,
+      (error, stdout, stderr) => {
+        if (error) {
+          console.error(
+            `Error: ${error.message}`,
+          );
+          return;
+        }
+        if (stderr) {
+          console.error(`Stderr: ${stderr}`);
+          return;
+        }
+        console.log(`Output:\n${stdout}`);
+      },
+    );
   }, 5000);
 
   return c.json({
