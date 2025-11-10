@@ -8,7 +8,15 @@ import {
   leaderboard,
 } from "../ponder.schema";
 import { formatEther } from "viem";
-import { sql } from "ponder";
+import { desc, sql } from "ponder";
+import offchainDatabase from "../offchain.database";
+import { priceTable } from "../offchain.schema";
+
+const [price] = await offchainDatabase
+  .select()
+  .from(priceTable)
+  .orderBy(desc(priceTable.id))
+  .limit(1);
 
 ponder.on(
   "PoidhContract:BountyCreated",
@@ -50,7 +58,11 @@ ponder.on(
       createdAt: timestamp,
       description: description,
       amount: amount.toString(),
-      amountSort: Number(formatEther(amount)),
+      amountSort:
+        Number(formatEther(amount)) *
+        (context.chain.id === 666666666
+          ? Number(price!.degen_usd)
+          : Number(price!.eth_usd)),
       issuer,
       isMultiplayer,
     });
@@ -141,11 +153,15 @@ ponder.on(
           BigInt(raw.amount) + amount
         ).toString(),
         isJoinedBounty: true,
-        amountSort: Number(
-          formatEther(
-            BigInt(raw.amount) + amount,
-          ),
-        ),
+        amountSort:
+          Number(
+            formatEther(
+              BigInt(raw.amount) + amount,
+            ),
+          ) *
+          (context.chain.id === 666666666
+            ? Number(price!.degen_usd)
+            : Number(price!.eth_usd)),
         deadline: Number(deadline),
       }));
 
@@ -189,11 +205,15 @@ ponder.on(
         amount: (
           BigInt(raw.amount) - amount
         ).toString(),
-        amountSort: Number(
-          formatEther(
-            BigInt(raw.amount) - amount,
-          ),
-        ),
+        amountSort:
+          Number(
+            formatEther(
+              BigInt(raw.amount) - amount,
+            ),
+          ) *
+          (context.chain.id === 666666666
+            ? Number(price!.degen_usd)
+            : Number(price!.eth_usd)),
       }));
 
     await database.delete(
@@ -325,7 +345,9 @@ ponder.on(
       .values({
         address: claimIssuer,
         chainId,
-        earned: bounty.amountSort,
+        earned: Number(
+          formatEther(BigInt(bounty.amount)),
+        ),
       })
       .onConflictDoUpdate({
         target: [
@@ -333,7 +355,7 @@ ponder.on(
           leaderboard.chainId,
         ],
         set: {
-          earned: sql`${leaderboard.earned} + ${bounty.amountSort}`,
+          earned: sql`${leaderboard.earned} + ${Number(formatEther(BigInt(bounty.amount)))}`,
         },
       });
     await Promise.all(

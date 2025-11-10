@@ -4,12 +4,23 @@ import { Hono } from "hono";
 import { and, eq, graphql } from "ponder";
 import { openAPI } from "./openAPI";
 import { swaggerUI } from "@hono/swagger-ui";
+import { desc } from "drizzle-orm";
+import database from "../../offchain.database";
+import { priceTable } from "../../offchain.schema";
+import { fetchPrice } from "../helpers/price";
+import crypto from "crypto";
+import { exec } from "child_process";
 
 const app = new Hono();
 
 app.route("/openapi", openAPI);
 
 app.use("/graphql", graphql({ db, schema }));
+
+const API_KEY = process.env.SERVER_API_KEY;
+const API_SECRET = process.env.SERVER_SECRET;
+const RAILWAY_TOKEN = process.env.RAILWAY_TOKEN;
+const SERVICE_ID = process.env.RAILWAY_SERVICE_ID;
 
 app.get(
   "/swagger",
@@ -28,6 +39,144 @@ app.get("/bounty/:chainId", async (c) => {
     .orderBy((bounty) => bounty.id);
 
   return c.json(bounties);
+});
+
+app.post("/updatePrice", async (c) => {
+  const providedKey = c.req.header("x-api-key");
+  const providedSignature = c.req.header(
+    "x-signature",
+  );
+  const timestamp = c.req.header("x-timestamp");
+  const body = await c.req.parseBody();
+
+  if (
+    !providedKey ||
+    !providedSignature ||
+    !timestamp
+  ) {
+    return c.json({ error: "Missing headers" });
+  }
+
+  if (!API_KEY || !API_SECRET) {
+    return c.json({
+      error: "API key or API secret is missing",
+    });
+  }
+
+  if (!RAILWAY_TOKEN || !SERVICE_ID) {
+    return c.json({
+      error: "Server needs configuration",
+    });
+  }
+
+  if (
+    Math.abs(
+      Date.now() / 1000 - parseInt(timestamp),
+    ) > 300
+  ) {
+    return c.json({ error: "Request expired" });
+  }
+
+  const canonical = `${c.req.method}|${c.req.path}|${timestamp}|${JSON.stringify(body)}`;
+
+  const hmac = crypto.createHmac(
+    "sha256",
+    API_SECRET,
+  );
+  const expectedSignature = hmac
+    .update(canonical)
+    .digest("hex");
+
+  if (
+    providedKey !== API_KEY ||
+    providedSignature !== expectedSignature
+  ) {
+    return c.json({
+      error: "Invalid credentials",
+    });
+  }
+
+  const [latestPrice] = await database
+    .select()
+    .from(priceTable)
+    .orderBy(desc(priceTable.id))
+    .limit(1);
+
+  const [currentPriceETH, currentPriceDegen] =
+    await Promise.all([
+      fetchPrice({
+        currency: "eth",
+      }),
+      fetchPrice({
+        currency: "degen",
+      }),
+    ]);
+
+  const percent = ({
+    current,
+    previous,
+  }: {
+    current: number;
+    previous: number;
+  }) => {
+    if (previous === 0) {
+      return 0;
+    }
+    return Math.abs(
+      ((current - previous) / previous) * 100,
+    );
+  };
+
+  const shouldUpdatePrice =
+    !latestPrice ||
+    percent({
+      current: currentPriceETH,
+      previous: Number(latestPrice.eth_usd),
+    }) > 3 ||
+    percent({
+      current: currentPriceDegen,
+      previous: Number(latestPrice.degen_usd),
+    }) > 3 ||
+    Number(latestPrice.eth_usd) === 0 ||
+    Number(latestPrice.eth_usd) === 0;
+
+  if (!shouldUpdatePrice) {
+    return c.json({
+      message: "Nothing to update",
+    });
+  }
+
+  await database.insert(priceTable).values({
+    eth_usd: currentPriceETH.toString(),
+    degen_usd: currentPriceDegen.toString(),
+  });
+
+  setTimeout(() => {
+    console.log(
+      "Server will be restarted in 5 seconds",
+    );
+
+    exec(
+      `RAILWAY_TOKEN=${RAILWAY_TOKEN} pnpm redeploy --service ${SERVICE_ID} --yes`,
+      (error, stdout, stderr) => {
+        if (error) {
+          console.error(
+            `Error: ${error.message}`,
+          );
+          return;
+        }
+        if (stderr) {
+          console.error(`Stderr: ${stderr}`);
+          return;
+        }
+        console.log(`Output:\n${stdout}`);
+      },
+    );
+  }, 5000);
+
+  return c.json({
+    message: "Restarting server…",
+  });
 });
 
 app.get(
