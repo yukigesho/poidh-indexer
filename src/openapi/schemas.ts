@@ -58,6 +58,10 @@ export const BountySchema = z
       example: 1713370239,
       description: "Voting deadline",
     }),
+    location: z.string().optional().openapi({
+      example: "New York",
+      description: "Bounty location",
+    }),
   })
   .openapi("Bounty");
 
