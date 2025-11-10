@@ -113,6 +113,7 @@ export const transactions = onchainTable(
     tx: t.hex().notNull(),
     index: t.integer().notNull(),
     bountyId: t.integer().notNull(),
+    claimId: t.integer(),
     chainId: t.integer().notNull(),
     address: t.hex().notNull(),
     action: t.text().notNull(),
