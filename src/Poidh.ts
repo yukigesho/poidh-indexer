@@ -283,6 +283,7 @@ ponder.on(
       tx: hash,
       address: issuer,
       bountyId: Number(bountyId),
+      claimId: Number(id),
       action: "claim created",
       chainId: context.chain.id,
       timestamp,
