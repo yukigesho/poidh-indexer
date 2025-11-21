@@ -1,9 +1,5 @@
 import { ponder } from "ponder:registry";
-import {
-  claims,
-  users,
-  leaderboard,
-} from "../ponder.schema";
+import { claims, users, leaderboard } from "../ponder.schema";
 import { and, eq, sql } from "ponder";
 
 const IGNORE_ADDRESSES = [
@@ -13,111 +9,82 @@ const IGNORE_ADDRESSES = [
   "0x0Aa50ce0d724cc28f8F7aF4630c32377B4d5c27d",
 ].map((address) => address.toLowerCase());
 
-ponder.on(
-  "PoidhNFTContract:Transfer",
-  async ({ event, context }) => {
-    const database = context.db;
-    const { to, tokenId, from } = event.args;
+ponder.on("PoidhNFTContract:Transfer", async ({ event, context }) => {
+  const database = context.db;
+  const { to, tokenId, from } = event.args;
 
-    const chainId = context.chain.id;
+  const chainId = context.chain.id;
 
-    if (
-      !IGNORE_ADDRESSES.includes(to.toLowerCase())
-    ) {
-      await database
-        .insert(users)
-        .values({ address: to })
-        .onConflictDoNothing();
-    }
+  if (!IGNORE_ADDRESSES.includes(to.toLowerCase())) {
+    await database.insert(users).values({ address: to }).onConflictDoNothing();
+  }
 
-    const url = await context.client.readContract(
-      {
-        abi: context.contracts.PoidhNFTContract
-          .abi,
-        address:
-          context.contracts.PoidhNFTContract
-            .address,
-        functionName: "tokenURI",
-        args: [tokenId],
-        blockNumber: event.block.number,
-      },
-    );
+  const url = await context.client.readContract({
+    abi: context.contracts.PoidhNFTContract.abi,
+    address: context.contracts.PoidhNFTContract.address,
+    functionName: "tokenURI",
+    args: [tokenId],
+    blockNumber: event.block.number,
+  });
+
+  await database
+    .insert(claims)
+    .values({
+      id: Number(tokenId),
+      chainId,
+      title: "",
+      description: "",
+      url,
+      bountyId: 0,
+      owner: to,
+      issuer: to,
+    })
+    .onConflictDoUpdate({
+      owner: to,
+    });
+
+  if (!IGNORE_ADDRESSES.includes(from.toLowerCase())) {
+    const fromNFTs =
+      (
+        await database.sql
+          .select({
+            count: sql<number>`count(*)`,
+          })
+          .from(claims)
+          .where(and(eq(claims.owner, from), eq(claims.chainId, chainId)))
+      )[0]?.count ?? 0;
 
     await database
-      .insert(claims)
+      .insert(leaderboard)
       .values({
-        id: Number(tokenId),
+        address: from,
         chainId,
-        title: "",
-        description: "",
-        url,
-        bountyId: 0,
-        owner: to,
-        issuer: to,
+        nfts: fromNFTs,
       })
       .onConflictDoUpdate({
-        owner: to,
+        nfts: fromNFTs,
       });
+  }
+  if (!IGNORE_ADDRESSES.includes(to.toLowerCase())) {
+    const toNFTs =
+      (
+        await database.sql
+          .select({
+            count: sql<number>`count(*)`,
+          })
+          .from(claims)
+          .where(and(eq(claims.owner, to), eq(claims.chainId, chainId)))
+      )[0]?.count ?? 0;
 
-    if (
-      !IGNORE_ADDRESSES.includes(
-        from.toLowerCase(),
-      )
-    ) {
-      const fromNFTs =
-        (
-          await database.sql
-            .select({
-              count: sql<number>`count(*)`,
-            })
-            .from(claims)
-            .where(
-              and(
-                eq(claims.owner, from),
-                eq(claims.chainId, chainId),
-              ),
-            )
-        )[0]?.count ?? 0;
-
-      await database
-        .insert(leaderboard)
-        .values({
-          address: from,
-          chainId,
-          nfts: fromNFTs,
-        })
-        .onConflictDoUpdate({
-          nfts: fromNFTs,
-        });
-    }
-    if (
-      !IGNORE_ADDRESSES.includes(to.toLowerCase())
-    ) {
-      const toNFTs =
-        (
-          await database.sql
-            .select({
-              count: sql<number>`count(*)`,
-            })
-            .from(claims)
-            .where(
-              and(
-                eq(claims.owner, to),
-                eq(claims.chainId, chainId),
-              ),
-            )
-        )[0]?.count ?? 0;
-
-      await database
-        .insert(leaderboard)
-        .values({
-          chainId,
-          address: to,
-          nfts: toNFTs,
-        })
-        .onConflictDoUpdate({
-          nfts: toNFTs,
-        });
-    }
-  },
-);
+    await database
+      .insert(leaderboard)
+      .values({
+        chainId,
+        address: to,
+        nfts: toNFTs,
+      })
+      .onConflictDoUpdate({
+        nfts: toNFTs,
+      });
+  }
+});

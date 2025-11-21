@@ -9,9 +9,7 @@ import {
 const schemaName = process.env.DATABASE_SCHEMA!;
 
 export const offchainSchema =
-  schemaName && schemaName !== "public"
-    ? pgSchema(schemaName)
-    : null;
+  schemaName && schemaName !== "public" ? pgSchema(schemaName) : null;
 
 export const priceTable = offchainSchema
   ? offchainSchema.table("Price", {

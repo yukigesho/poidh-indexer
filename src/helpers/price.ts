@@ -1,10 +1,6 @@
 type Currency = "eth" | "degen";
 
-export async function fetchPrice({
-  currency,
-}: {
-  currency: Currency;
-}) {
+export async function fetchPrice({ currency }: { currency: Currency }) {
   let retries = 5;
   while (true) {
     try {
@@ -14,9 +10,7 @@ export async function fetchPrice({
       const body = await response.json();
       const price = (body as any).data.rates.USD;
       if (!price) {
-        throw new Error(
-          `USD price not found… attempts left: ${retries}`,
-        );
+        throw new Error(`USD price not found… attempts left: ${retries}`);
       }
       return Number(price);
     } catch (e) {

@@ -11,7 +11,11 @@ import { formatEther } from "viem";
 import { desc, sql } from "ponder";
 import offchainDatabase from "../offchain.database";
 import { priceTable } from "../offchain.schema";
-import { getCreatorDisplayName, isLive, sendNotification } from "./helpers/notifications";
+import {
+  getCreatorDisplayName,
+  isLive,
+  sendNotification,
+} from "./helpers/notifications";
 
 const POIDH_BASE_URL = "https://poidh.xyz";
 
@@ -81,7 +85,7 @@ ponder.on("PoidhContract:BountyCreated", async ({ event, context }) => {
     const creatorName = await getCreatorDisplayName(issuer);
     await sendNotification({
       title: `💰 NEW $${amountSort.toFixed(0)} BOUNTY 💰`,
-      messageBody: `${name}${creatorName ? ` from ${creatorName}` : ''}`,
+      messageBody: `${name}${creatorName ? ` from ${creatorName}` : ""}`,
       targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${id}`,
       targetFIds: [],
     });
@@ -209,7 +213,7 @@ ponder.on(
       chainId: context.chain.id,
       timestamp,
     });
-  }
+  },
 );
 
 ponder.on("PoidhContract:ClaimCreated", async ({ event, context }) => {
@@ -307,7 +311,7 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
       target: [leaderboard.address, leaderboard.chainId],
       set: {
         earned: sql`${leaderboard.earned} + ${Number(
-          formatEther(BigInt(bounty.amount))
+          formatEther(BigInt(bounty.amount)),
         )}`,
       },
     });
@@ -327,7 +331,7 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
             paid: sql`${leaderboard.paid} + ${paid}`,
           },
         });
-    })
+    }),
   );
 });
 

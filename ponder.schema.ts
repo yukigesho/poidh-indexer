@@ -1,9 +1,4 @@
-import {
-  index,
-  onchainTable,
-  primaryKey,
-  relations,
-} from "ponder";
+import { index, onchainTable, primaryKey, relations } from "ponder";
 
 export const bounties = onchainTable(
   "Bounties",
@@ -87,25 +82,20 @@ export const leaderboard = onchainTable(
   }),
 );
 
-export const participationsBounties =
-  onchainTable(
-    "ParticipationsBounties",
-    (t) => ({
-      userAddress: t.hex().notNull(),
-      bountyId: t.integer().notNull(),
-      chainId: t.integer().notNull(),
-      amount: t.text().notNull(),
+export const participationsBounties = onchainTable(
+  "ParticipationsBounties",
+  (t) => ({
+    userAddress: t.hex().notNull(),
+    bountyId: t.integer().notNull(),
+    chainId: t.integer().notNull(),
+    amount: t.text().notNull(),
+  }),
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.userAddress, table.bountyId, table.chainId],
     }),
-    (table) => ({
-      pk: primaryKey({
-        columns: [
-          table.userAddress,
-          table.bountyId,
-          table.chainId,
-        ],
-      }),
-    }),
-  );
+  }),
+);
 
 export const transactions = onchainTable(
   "Transactions",
@@ -121,94 +111,72 @@ export const transactions = onchainTable(
   }),
   (table) => ({
     pk: primaryKey({
-      columns: [
-        table.tx,
-        table.index,
-        table.chainId,
-      ],
+      columns: [table.tx, table.index, table.chainId],
     }),
   }),
 );
 
-export const bountiesRelations = relations(
-  bounties,
-  ({ many, one }) => ({
-    claims: many(claims),
-    participants: many(participationsBounties),
-    issuer: one(users, {
-      fields: [bounties.issuer],
-      references: [users.address],
-    }),
-    transactions: many(transactions),
+export const bountiesRelations = relations(bounties, ({ many, one }) => ({
+  claims: many(claims),
+  participants: many(participationsBounties),
+  issuer: one(users, {
+    fields: [bounties.issuer],
+    references: [users.address],
   }),
-);
+  transactions: many(transactions),
+}));
 
-export const usersRelations = relations(
-  users,
-  ({ many, one }) => ({
-    bounties: many(bounties),
-    claims: many(claims),
-    participations: many(participationsBounties),
-    transactions: many(transactions),
-    score: many(leaderboard),
+export const usersRelations = relations(users, ({ many, one }) => ({
+  bounties: many(bounties),
+  claims: many(claims),
+  participations: many(participationsBounties),
+  transactions: many(transactions),
+  score: many(leaderboard),
+}));
+
+export const claimsRelations = relations(claims, ({ one }) => ({
+  bounty: one(bounties, {
+    fields: [claims.bountyId, claims.chainId],
+    references: [bounties.id, bounties.chainId],
   }),
-);
-
-export const claimsRelations = relations(
-  claims,
-  ({ one }) => ({
-    bounty: one(bounties, {
-      fields: [claims.bountyId, claims.chainId],
-      references: [bounties.id, bounties.chainId],
-    }),
-    issuer: one(users, {
-      fields: [claims.issuer],
-      references: [users.address],
-    }),
-    owner: one(users, {
-      fields: [claims.owner],
-      references: [users.address],
-    }),
+  issuer: one(users, {
+    fields: [claims.issuer],
+    references: [users.address],
   }),
-);
+  owner: one(users, {
+    fields: [claims.owner],
+    references: [users.address],
+  }),
+}));
 
-export const participationsBountiesRelations =
-  relations(
-    participationsBounties,
-    ({ one }) => ({
-      user: one(users, {
-        fields: [
-          participationsBounties.userAddress,
-        ],
-        references: [users.address],
-      }),
-      bounty: one(bounties, {
-        fields: [participationsBounties.bountyId],
-        references: [bounties.id],
-      }),
-    }),
-  );
-
-export const transactionRelations = relations(
-  transactions,
+export const participationsBountiesRelations = relations(
+  participationsBounties,
   ({ one }) => ({
     user: one(users, {
-      fields: [transactions.address],
+      fields: [participationsBounties.userAddress],
       references: [users.address],
     }),
-    bounties: one(bounties, {
-      fields: [transactions.bountyId],
+    bounty: one(bounties, {
+      fields: [participationsBounties.bountyId],
       references: [bounties.id],
     }),
   }),
 );
 
-export const leaderboardRelations = relations(
-  leaderboard,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [leaderboard.address],
-      references: [users.address],
-    }),
+export const transactionRelations = relations(transactions, ({ one }) => ({
+  user: one(users, {
+    fields: [transactions.address],
+    references: [users.address],
   }),
-);
+  bounties: one(bounties, {
+    fields: [transactions.bountyId],
+    references: [bounties.id],
+  }),
+}));
+
+export const leaderboardRelations = relations(leaderboard, ({ one }) => ({
+  user: one(users, {
+    fields: [leaderboard.address],
+    references: [users.address],
+  }),
+}));

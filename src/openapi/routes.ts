@@ -28,26 +28,23 @@ export const getChainBountiesRoute = createRoute({
   },
 });
 
-export const getVotingBountiesRoute = createRoute(
-  {
-    method: "get",
-    path: "/voting/bounty/{chainId}",
-    request: {
-      params: GetByChainId,
-    },
-    responses: {
-      200: {
-        content: {
-          "application/json": {
-            schema: BountiesSchema,
-          },
+export const getVotingBountiesRoute = createRoute({
+  method: "get",
+  path: "/voting/bounty/{chainId}",
+  request: {
+    params: GetByChainId,
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: BountiesSchema,
         },
-        description:
-          "Retrieve bounties with voting in progress",
       },
+      description: "Retrieve bounties with voting in progress",
     },
   },
-);
+});
 
 export const getPastBountiesRoute = createRoute({
   method: "get",
@@ -80,8 +77,7 @@ export const getLiveBountiesRoute = createRoute({
           schema: BountiesSchema,
         },
       },
-      description:
-        "Retrieve in progress bounties",
+      description: "Retrieve in progress bounties",
     },
   },
 });
@@ -104,25 +100,23 @@ export const getBountyRoute = createRoute({
   },
 });
 
-export const getBountyParticipationsRouter =
-  createRoute({
-    method: "get",
-    path: "/bounty/participations/{chainId}/{bountyId}",
-    request: {
-      params: GetByBountyIdAndChainIdParamsSchema,
-    },
-    responses: {
-      200: {
-        content: {
-          "application/json": {
-            schema: ParticipationsSchema,
-          },
+export const getBountyParticipationsRouter = createRoute({
+  method: "get",
+  path: "/bounty/participations/{chainId}/{bountyId}",
+  request: {
+    params: GetByBountyIdAndChainIdParamsSchema,
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: ParticipationsSchema,
         },
-        description:
-          "Retrieve the participations for the bounty",
       },
+      description: "Retrieve the participations for the bounty",
     },
-  });
+  },
+});
 
 export const getBountyClaimsRoute = createRoute({
   method: "get",
@@ -137,8 +131,7 @@ export const getBountyClaimsRoute = createRoute({
           schema: ClaimsSchema,
         },
       },
-      description:
-        "Retrieve the claims for the bounty",
+      description: "Retrieve the claims for the bounty",
     },
   },
 });

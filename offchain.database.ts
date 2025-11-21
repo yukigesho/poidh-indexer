@@ -1,9 +1,6 @@
 import dotenv from "dotenv";
 import * as offchainSchema from "./offchain.schema";
-import {
-  drizzle,
-  NodePgDatabase,
-} from "drizzle-orm/node-postgres";
+import { drizzle, NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import fs from "fs";
 
@@ -11,9 +8,7 @@ fs.existsSync(".env")
   ? dotenv.config({ path: ".env" })
   : dotenv.config({ path: ".env.local" });
 
-let database: NodePgDatabase<
-  typeof offchainSchema
-> | null = null;
+let database: NodePgDatabase<typeof offchainSchema> | null = null;
 
 async function createDatabaseConnection() {
   if (database) {

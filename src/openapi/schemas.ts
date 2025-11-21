@@ -112,13 +112,9 @@ export const ParticipationSchema = z
   })
   .openapi("Participation");
 
-export const BountiesSchema = z
-  .array(BountySchema)
-  .openapi("Bounties");
+export const BountiesSchema = z.array(BountySchema).openapi("Bounties");
 
-export const ClaimsSchema = z
-  .array(ClaimSchema)
-  .openapi("Claims");
+export const ClaimsSchema = z.array(ClaimSchema).openapi("Claims");
 
 export const ParticipationsSchema = z
   .array(ParticipationSchema)
@@ -134,38 +130,36 @@ export const GetByChainId = z.object({
   }),
 });
 
-export const GetByBountyIdAndChainIdParamsSchema =
-  z.object({
-    chainId: z.number().openapi({
-      param: {
-        name: "chainId",
-        in: "path",
-      },
-      example: 8453,
-    }),
-    bountyId: z.number().openapi({
-      param: {
-        name: "bountyId",
-        in: "path",
-      },
-      example: 332,
-    }),
-  });
+export const GetByBountyIdAndChainIdParamsSchema = z.object({
+  chainId: z.number().openapi({
+    param: {
+      name: "chainId",
+      in: "path",
+    },
+    example: 8453,
+  }),
+  bountyId: z.number().openapi({
+    param: {
+      name: "bountyId",
+      in: "path",
+    },
+    example: 332,
+  }),
+});
 
-export const GetByClaimIdAndChainIdParamsSchema =
-  z.object({
-    chainId: z.number().openapi({
-      param: {
-        name: "chainId",
-        in: "path",
-      },
-      example: 8453,
-    }),
-    claimId: z.number().openapi({
-      param: {
-        name: "claimId",
-        in: "path",
-      },
-      example: 777,
-    }),
-  });
+export const GetByClaimIdAndChainIdParamsSchema = z.object({
+  chainId: z.number().openapi({
+    param: {
+      name: "chainId",
+      in: "path",
+    },
+    example: 8453,
+  }),
+  claimId: z.number().openapi({
+    param: {
+      name: "claimId",
+      in: "path",
+    },
+    example: 777,
+  }),
+});
