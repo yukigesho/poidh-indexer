@@ -13,11 +13,19 @@ import offchainDatabase from "../offchain.database";
 import { priceTable } from "../offchain.schema";
 import {
   getCreatorDisplayName,
-  isLive,
+  getFarcasterUser,
   sendNotification,
 } from "./helpers/notifications";
+import { getCurrencyByChainId } from "./helpers/price";
 
 const POIDH_BASE_URL = "https://poidh.xyz";
+
+function isLive(block: bigint) {
+  const nowSec = BigInt(Math.floor(Date.now() / 1000));
+  const maxDrift = 60n;
+
+  return nowSec - block <= maxDrift;
+}
 
 const [price] = await offchainDatabase
   .select()
@@ -87,7 +95,6 @@ ponder.on("PoidhContract:BountyCreated", async ({ event, context }) => {
       title: `💰 NEW $${amountSort.toFixed(0)} BOUNTY 💰`,
       messageBody: `${name}${creatorName ? ` from ${creatorName}` : ""}`,
       targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${id}`,
-      targetFIds: [],
     });
   }
 });
@@ -315,6 +322,7 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
         )}`,
       },
     });
+
   await Promise.all(
     participations.map(async (p) => {
       const paid = Number(formatEther(BigInt(p.amount)));
@@ -333,6 +341,18 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
         });
     }),
   );
+
+  const claimIssuerFarcaster = await getFarcasterUser(claimIssuer);
+  const isSoloBounty = participations.length === 1;
+  if (isSoloBounty && claimIssuerFarcaster?.fid && isLive(event.block.timestamp)) {
+    const creatorName = await getCreatorDisplayName(bounty.issuer);
+    await sendNotification({
+      title: `you won a bounty! 🏆`,
+      messageBody: `you're the winner of ${bounty.title} from ${creatorName} - bounty funds have been transferred to your wallet`,
+      targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${bounty.id}`,
+      targetFIds: [claimIssuerFarcaster.fid],
+    });
+  }
 });
 
 ponder.on("PoidhContract:ResetVotingPeriod", async ({ event, context }) => {

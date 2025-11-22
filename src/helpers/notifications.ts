@@ -1,13 +1,6 @@
 const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
 
-export function isLive(block: bigint) {
-  const nowSec = BigInt(Math.floor(Date.now() / 1000));
-  const maxDrift = 60n;
-
-  return nowSec - block <= maxDrift;
-}
-
-export async function getCreatorDisplayName(address: string): Promise<string> {
+export async function getFarcasterUser(address: string) {
   try {
     if (!NEYNAR_API_KEY) {
       throw Error("Neynar key not found");
@@ -21,17 +14,20 @@ export async function getCreatorDisplayName(address: string): Promise<string> {
     const response = await fetch(url, options);
     const farcasterUserData = (await response.json()) as Record<
       string,
-      Array<{ username?: string }>
+      Array<{ username: string, fid: number }>
     >;
-    console.log(farcasterUserData);
-    const farcasterUser = farcasterUserData?.[address.toLowerCase()]?.[0];
-    if (farcasterUser?.username) {
-      return `@${farcasterUser.username}`;
-    }
+    return farcasterUserData?.[address.toLowerCase()]?.[0];
   } catch (error) {
     console.warn("Failed to fetch Farcaster user:", error);
   }
+  return null;
+}
 
+export async function getCreatorDisplayName(address: string): Promise<string> {
+  const farcasterUser = await getFarcasterUser(address);
+  if (farcasterUser?.username) {
+    return `@${farcasterUser.username}`;
+  }
   return `${address.slice(0, 7)}`;
 }
 
@@ -39,12 +35,12 @@ export async function sendNotification({
   title,
   messageBody,
   targetUrl,
-  targetFIds,
+  targetFIds = [],
 }: {
   title: string;
   messageBody: string;
   targetUrl: string;
-  targetFIds: Array<number>;
+  targetFIds?: Array<number>;
 }) {
   if (!NEYNAR_API_KEY) {
     throw Error("Neynar key not found");
