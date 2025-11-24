@@ -12,11 +12,10 @@ import { desc, sql } from "ponder";
 import offchainDatabase from "../offchain.database";
 import { priceTable } from "../offchain.schema";
 import {
-  getCreatorDisplayName,
-  getFarcasterUser,
+  getDisplayName,
+  getFarcasterUsers,
   sendNotification,
 } from "./helpers/notifications";
-import { getCurrencyByChainId } from "./helpers/price";
 
 const POIDH_BASE_URL = "https://poidh.xyz";
 
@@ -90,7 +89,7 @@ ponder.on("PoidhContract:BountyCreated", async ({ event, context }) => {
   });
 
   if (amountSort >= 100 && isLive(event.block.timestamp)) {
-    const creatorName = await getCreatorDisplayName(issuer);
+    const creatorName = await getDisplayName(issuer);
     await sendNotification({
       title: `💰 NEW $${amountSort.toFixed(0)} BOUNTY 💰`,
       messageBody: `${name}${creatorName ? ` from ${creatorName}` : ""}`,
@@ -220,7 +219,7 @@ ponder.on(
       chainId: context.chain.id,
       timestamp,
     });
-  },
+  }
 );
 
 ponder.on("PoidhContract:ClaimCreated", async ({ event, context }) => {
@@ -263,6 +262,50 @@ ponder.on("PoidhContract:ClaimCreated", async ({ event, context }) => {
     chainId: context.chain.id,
     timestamp,
   });
+
+  if (isLive(event.block.timestamp)) {
+    const contributors =
+      await database.sql.query.participationsBounties.findMany({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.bountyId, Number(bountyId)),
+            eq(table.chainId, context.chain.id)
+          ),
+      });
+
+    const farcasterUsers = await getFarcasterUsers(
+      contributors.map((c) => c.userAddress.toLowerCase())
+    );
+
+    const targetFIds = Object.values(farcasterUsers)
+      .map((u) =>
+        Array.isArray(u)
+          ? (u[0] as { fid?: number } | null)
+          : (u as { fid?: number } | null)
+      )
+      .filter(
+        (u): u is { fid: number } => u != null && typeof u.fid === "number"
+      )
+      .map((u) => u.fid);
+
+    if (targetFIds.length > 0) {
+      const claimCreatorName = await getDisplayName(issuer);
+      const bounty = await database.sql.query.bounties.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.id, Number(bountyId)),
+            eq(table.chainId, context.chain.id)
+          ),
+      });
+
+      await sendNotification({
+        title: "new claim on poidh 🖼️",
+        messageBody: `${bounty?.title} has received a new claim from ${claimCreatorName}`,
+        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${bountyId}`,
+        targetFIds,
+      });
+    }
+  }
 });
 
 ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
@@ -318,7 +361,7 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
       target: [leaderboard.address, leaderboard.chainId],
       set: {
         earned: sql`${leaderboard.earned} + ${Number(
-          formatEther(BigInt(bounty.amount)),
+          formatEther(BigInt(bounty.amount))
         )}`,
       },
     });
@@ -339,19 +382,24 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
             paid: sql`${leaderboard.paid} + ${paid}`,
           },
         });
-    }),
+    })
   );
 
-  const claimIssuerFarcaster = await getFarcasterUser(claimIssuer);
-  const isSoloBounty = participations.length === 1;
-  if (isSoloBounty && claimIssuerFarcaster?.fid && isLive(event.block.timestamp)) {
-    const creatorName = await getCreatorDisplayName(bounty.issuer);
-    await sendNotification({
-      title: `you won a bounty! 🏆`,
-      messageBody: `you're the winner of ${bounty.title} from ${creatorName} - bounty funds have been transferred to your wallet`,
-      targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${bounty.id}`,
-      targetFIds: [claimIssuerFarcaster.fid],
-    });
+  if (isLive(event.block.timestamp)) {
+    const isSoloBounty = participations.length === 1;
+    const farcasterUsers = await getFarcasterUsers([claimIssuer.toLowerCase()]);
+    const targetUser = farcasterUsers[claimIssuer.toLowerCase()];
+    const targetFId = targetUser ? targetUser[0]?.fid : null;
+
+    if (isSoloBounty && targetFId) {
+      const creatorName = await getDisplayName(bounty.issuer);
+      await sendNotification({
+        title: "you won a bounty! 🏆",
+        messageBody: `you're the winner of ${bounty.title} from ${creatorName} - bounty funds have been transferred to your wallet`,
+        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${bounty.id}`,
+        targetFIds: [targetFId],
+      });
+    }
   }
 });
 

@@ -1,34 +1,43 @@
 const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
 
-export async function getFarcasterUser(address: string) {
+type FarcasterUser = {
+  fid: number;
+  username: string;
+};
+
+export async function getFarcasterUsers(
+  addresses: string[]
+): Promise<Record<string, FarcasterUser[]>> {
   try {
     if (!NEYNAR_API_KEY) {
       throw Error("Neynar key not found");
     }
 
-    const url = `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${address}`;
+    const url = `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${addresses.join(
+      ","
+    )}`;
     const options = {
       method: "GET",
       headers: { "x-api-key": NEYNAR_API_KEY },
     };
     const response = await fetch(url, options);
-    const farcasterUserData = (await response.json()) as Record<
-      string,
-      Array<{ username: string, fid: number }>
-    >;
-    return farcasterUserData?.[address.toLowerCase()]?.[0];
+    if (!response.ok) {
+      throw new Error(`Neynar request failed with ${response.status}`);
+    }
+    const data = (await response.json()) as Record<string, FarcasterUser[]>;
+    return data;
   } catch (error) {
-    console.warn("Failed to fetch Farcaster user:", error);
+    return {};
   }
-  return null;
 }
 
-export async function getCreatorDisplayName(address: string): Promise<string> {
-  const farcasterUser = await getFarcasterUser(address);
-  if (farcasterUser?.username) {
-    return `@${farcasterUser.username}`;
+export async function getDisplayName(address: string): Promise<string> {
+  const users = await getFarcasterUsers([address.toLowerCase()]);
+  const userArray = users[address.toLowerCase()];
+  if (userArray && userArray[0]?.username) {
+    return `@${userArray[0].username}`;
   }
-  return `${address.slice(0, 7)}`;
+  return address.slice(0, 7);
 }
 
 export async function sendNotification({
