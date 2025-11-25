@@ -144,7 +144,7 @@ ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
     args: [bountyId],
   });
 
-  await database
+  const updatedBounty = await database
     .update(bounties, {
       id: Number(bountyId),
       chainId: context.chain.id,
@@ -178,6 +178,25 @@ ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
     chainId: context.chain.id,
     timestamp,
   });
+
+  const joinedAmountUsd =
+    Number(formatEther(BigInt(amount))) *
+    (context.chain.id === 666666666
+      ? Number(price!.degen_usd)
+      : Number(price!.eth_usd));
+  if (
+    isLive(event.block.timestamp) &&
+    updatedBounty.amountSort - joinedAmountUsd < 100
+  ) {
+    const creatorName = await getDisplayName(updatedBounty.issuer);
+    await sendNotification({
+      title: `💰 NEW $${updatedBounty.amountSort.toFixed(0)} BOUNTY 💰`,
+      messageBody: `${updatedBounty.title}${
+        creatorName ? ` from ${creatorName}` : ""
+      }`,
+      targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
+    });
+  }
 });
 
 ponder.on(
