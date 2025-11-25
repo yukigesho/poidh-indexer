@@ -473,7 +473,7 @@ ponder.on("PoidhContract:ClaimSubmittedForVote", async ({ event, context }) => {
     blockNumber: event.block.number,
   });
 
-  await database
+  const updatedBounty = await database
     .update(bounties, {
       id: Number(bountyId),
       chainId: context.chain.id,
@@ -492,6 +492,29 @@ ponder.on("PoidhContract:ClaimSubmittedForVote", async ({ event, context }) => {
     chainId: context.chain.id,
     timestamp,
   });
+
+  if (isLive(timestamp)) {
+    const submittedClaim = await database.sql.query.claims.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.id, Number(claimId)), eq(table.chainId, context.chain.id)),
+    });
+    if (!submittedClaim) return;
+
+    const targetFarcasterUser = await getFarcasterUsers([
+      submittedClaim.issuer.toLowerCase(),
+    ]);
+    const targetFId =
+      targetFarcasterUser[submittedClaim.issuer.toLowerCase()]?.[0]?.fid;
+
+    if (targetFId) {
+      await sendNotification({
+        title: `your claim is nominated 🗳️`,
+        messageBody: `your claim is up for vote for ${updatedBounty.title} - contributors will now vote to confirm`,
+        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
+        targetFIds: [targetFId],
+      });
+    }
+  }
 });
 
 ponder.on("PoidhContract:VoteClaim", async ({ event, context }) => {
