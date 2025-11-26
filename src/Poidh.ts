@@ -186,6 +186,7 @@ ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
       : Number(price!.eth_usd));
   if (
     isLive(event.block.timestamp) &&
+    updatedBounty.amountSort >= 100 &&
     updatedBounty.amountSort - joinedAmountUsd < 100
   ) {
     const creatorName = await getDisplayName(updatedBounty.issuer);
