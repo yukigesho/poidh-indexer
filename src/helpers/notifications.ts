@@ -79,3 +79,16 @@ export async function sendNotification({
     }
   }
 }
+
+export function extractFids(farcasterUsers: Record<string, any>): number[] {
+  return Object.values(farcasterUsers)
+    .map((u) =>
+      Array.isArray(u)
+        ? (u[0] as { fid?: number } | null)
+        : (u as { fid?: number } | null)
+    )
+    .filter(
+      (u): u is { fid: number } => u != null && typeof u.fid === "number"
+    )
+    .map((u) => u.fid);
+}
