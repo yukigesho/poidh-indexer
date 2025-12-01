@@ -17,6 +17,7 @@ import {
   getFarcasterUsers,
   sendNotification,
 } from "./helpers/notifications";
+import { getCurrencyByChainId } from "./helpers/price";
 
 const POIDH_BASE_URL = "https://poidh.xyz";
 
@@ -180,24 +181,55 @@ ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
     timestamp,
   });
 
-  const joinedAmountUsd =
-    Number(formatEther(BigInt(amount))) *
-    (context.chain.id === 666666666
-      ? Number(price!.degen_usd)
-      : Number(price!.eth_usd));
-  if (
-    isLive(event.block.timestamp) &&
-    updatedBounty.amountSort >= 100 &&
-    updatedBounty.amountSort - joinedAmountUsd < 100
-  ) {
-    const creatorName = await getDisplayName(updatedBounty.issuer);
-    await sendNotification({
-      title: `💰 NEW $${updatedBounty.amountSort.toFixed(0)} BOUNTY 💰`,
-      messageBody: `${updatedBounty.title}${
-        creatorName ? ` from ${creatorName}` : ""
-      }`,
-      targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
-    });
+  if (isLive(event.block.timestamp)) {
+    const joinedAmountUsd =
+      Number(formatEther(BigInt(amount))) *
+      (context.chain.id === 666666666
+        ? Number(price!.degen_usd)
+        : Number(price!.eth_usd));
+    if (
+      updatedBounty.amountSort >= 100 &&
+      updatedBounty.amountSort - joinedAmountUsd < 100
+    ) {
+      const creatorName = await getDisplayName(updatedBounty.issuer);
+      await sendNotification({
+        title: `💰 NEW $${updatedBounty.amountSort.toFixed(0)} BOUNTY 💰`,
+        messageBody: `${updatedBounty.title}${
+          creatorName ? ` from ${creatorName}` : ""
+        }`,
+        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
+      });
+    }
+
+    const bountyParticipants =
+      await database.sql.query.participationsBounties.findMany({
+        where: (table, { and, eq, ne }) =>
+          and(
+            eq(table.bountyId, Number(bountyId)),
+            eq(table.chainId, context.chain.id),
+            ne(table.userAddress, participant)
+          ),
+      });
+    const bountyParticipantsTargetUsers = await getFarcasterUsers(
+      bountyParticipants.map((p) => p.userAddress.toLowerCase())
+    );
+    const bountyParticipantsTargetFids = extractFids(
+      bountyParticipantsTargetUsers
+    );
+    if (bountyParticipantsTargetFids.length > 0) {
+      const contributorDisplayName = await getDisplayName(participant);
+      const currency = getCurrencyByChainId({ chainId: context.chain.id });
+      await sendNotification({
+        title: "new contribution on poidh 💰",
+        messageBody: `${
+          updatedBounty.title
+        } has received a contribution of ${formatEther(
+          BigInt(amount)
+        )} ${currency.toUpperCase()} from ${contributorDisplayName}`,
+        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
+        targetFIds: bountyParticipantsTargetFids,
+      });
+    }
   }
 });
 
