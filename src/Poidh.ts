@@ -423,10 +423,8 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
   );
 
   if (isLive(event.block.timestamp)) {
-    const isSoloBounty = participations.length === 1;
     const targetFIds = await getFarcasterFids([claimIssuer.toLowerCase()]);
-
-    if (isSoloBounty && targetFIds.length > 0) {
+    if (targetFIds.length > 0) {
       const creatorName = await getDisplayName(bounty.issuer);
       await sendNotification({
         title: "you won a bounty! 🏆",
