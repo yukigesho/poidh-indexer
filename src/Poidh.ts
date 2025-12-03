@@ -12,9 +12,8 @@ import { desc, sql } from "ponder";
 import offchainDatabase from "../offchain.database";
 import { priceTable } from "../offchain.schema";
 import {
-  extractFids,
+  getFarcasterFids,
   getDisplayName,
-  getFarcasterUsers,
   sendNotification,
 } from "./helpers/notifications";
 import { getCurrencyByChainId } from "./helpers/price";
@@ -210,11 +209,8 @@ ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
             ne(table.userAddress, participant)
           ),
       });
-    const bountyParticipantsTargetUsers = await getFarcasterUsers(
-      bountyParticipants.map((p) => p.userAddress.toLowerCase())
-    );
-    const bountyParticipantsTargetFids = extractFids(
-      bountyParticipantsTargetUsers
+    const bountyParticipantsTargetFids = await getFarcasterFids(
+      bountyParticipants.map((p) => p.userAddress)
     );
     if (bountyParticipantsTargetFids.length > 0) {
       const contributorDisplayName = await getDisplayName(participant);
@@ -326,11 +322,9 @@ ponder.on("PoidhContract:ClaimCreated", async ({ event, context }) => {
           ),
       });
 
-    const farcasterUsers = await getFarcasterUsers(
-      contributors.map((c) => c.userAddress.toLowerCase())
+    const targetFIds = await getFarcasterFids(
+      contributors.map((c) => c.userAddress)
     );
-
-    const targetFIds = extractFids(farcasterUsers);
     if (targetFIds.length > 0) {
       const claimCreatorName = await getDisplayName(issuer);
       const bounty = await database.sql.query.bounties.findFirst({
@@ -430,17 +424,15 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
 
   if (isLive(event.block.timestamp)) {
     const isSoloBounty = participations.length === 1;
-    const farcasterUsers = await getFarcasterUsers([claimIssuer.toLowerCase()]);
-    const targetUser = farcasterUsers[claimIssuer.toLowerCase()];
-    const targetFId = targetUser ? targetUser[0]?.fid : null;
+    const targetFIds = await getFarcasterFids([claimIssuer.toLowerCase()]);
 
-    if (isSoloBounty && targetFId) {
+    if (isSoloBounty && targetFIds.length > 0) {
       const creatorName = await getDisplayName(bounty.issuer);
       await sendNotification({
         title: "you won a bounty! 🏆",
         messageBody: `you're the winner of ${bounty.title} from ${creatorName} - bounty funds have been transferred to your wallet`,
         targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${bounty.id}`,
-        targetFIds: [targetFId],
+        targetFIds: targetFIds,
       });
     }
   }
@@ -524,20 +516,19 @@ ponder.on("PoidhContract:ClaimSubmittedForVote", async ({ event, context }) => {
     });
     if (!submittedClaim) return;
 
-    const yourClaimIsNominatedTargetUser = await getFarcasterUsers([
-      submittedClaim.issuer.toLowerCase(),
+    const nominatedUserTargetFids = await getFarcasterFids([
+      submittedClaim.issuer,
     ]);
-    const yourClaimIsNominatedTargetUserFId =
-      yourClaimIsNominatedTargetUser[submittedClaim.issuer.toLowerCase()]?.[0]
-        ?.fid;
-    if (yourClaimIsNominatedTargetUserFId) {
+    if (nominatedUserTargetFids.length > 0) {
       await sendNotification({
         title: `your claim is nominated 🗳️`,
         messageBody: `your claim is up for vote for ${updatedBounty.title} - contributors will now vote to confirm`,
         targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
-        targetFIds: [yourClaimIsNominatedTargetUserFId],
+        targetFIds: nominatedUserTargetFids,
       });
     }
+
+    const bountyIssuerDisplayName = await getDisplayName(updatedBounty.issuer);
 
     const bountyParticipants =
       await database.sql.query.participationsBounties.findMany({
@@ -548,21 +539,33 @@ ponder.on("PoidhContract:ClaimSubmittedForVote", async ({ event, context }) => {
             ne(table.userAddress, updatedBounty.issuer)
           ),
       });
-    const bountyParticipantsTargetUsers = await getFarcasterUsers(
-      bountyParticipants.map((p) => p.userAddress.toLowerCase())
-    );
-    const bountyParticipantsTargetFids = extractFids(
-      bountyParticipantsTargetUsers
+    const bountyParticipantsTargetFids = await getFarcasterFids(
+      bountyParticipants.map((p) => p.userAddress)
     );
     if (bountyParticipantsTargetFids.length > 0) {
-      const bountyIssuerDisplayName = await getDisplayName(
-        updatedBounty.issuer
-      );
       await sendNotification({
         title: `your vote is needed 🗳️`,
         messageBody: `${bountyIssuerDisplayName} has proposed a winner for ${updatedBounty.title} - you have 48 hours to vote`,
         targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
         targetFIds: bountyParticipantsTargetFids,
+      });
+    }
+
+    const allBountyClaims = await database.sql
+      .selectDistinctOn([claims.issuer])
+      .from(claims)
+      .where(
+        sql`${claims.bountyId} = ${bountyId} and ${claims.chainId} = ${context.chain.id} and not lower(${claims.issuer}) = lower(${submittedClaim.issuer})`
+      );
+    const claimIssuerFIds = await getFarcasterFids(
+      allBountyClaims.map((c) => c.issuer)
+    );
+    if (claimIssuerFIds.length > 0) {
+      await sendNotification({
+        title: `your claim was not nominated`,
+        messageBody: `${bountyIssuerDisplayName} has proposed a winner for ${updatedBounty.title} - your claim was not selected`,
+        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
+        targetFIds: claimIssuerFIds,
       });
     }
   }
