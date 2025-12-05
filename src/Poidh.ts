@@ -458,7 +458,7 @@ ponder.on("PoidhContract:ResetVotingPeriod", async ({ event, context }) => {
     .set({
       deadline: Number(deadline),
       isVoting: false,
-      inProgress: false,
+      inProgress: true,
     });
 
   await database.insert(transactions).values({
