@@ -111,7 +111,7 @@ export const transactions = onchainTable(
   }),
   (table) => ({
     pk: primaryKey({
-      columns: [table.tx, table.index, table.chainId],
+      columns: [table.bountyId, table.tx, table.index, table.chainId],
     }),
   }),
 );
