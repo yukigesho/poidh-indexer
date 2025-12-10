@@ -500,7 +500,7 @@ ponder.on("PoidhContract:ClaimSubmittedForVote", async ({ event, context }) => {
   await database.insert(transactions).values({
     index: transactionIndex,
     tx: hash,
-    address: "0x0",
+    address: updatedBounty.issuer,
     bountyId: Number(bountyId),
     action: `${claimId} submitted for vote`,
     chainId: context.chain.id,
