@@ -1,4 +1,5 @@
 import { ponder } from "ponder:registry";
+import { sql } from "ponder";
 import {
   bounties,
   claims,
@@ -6,26 +7,19 @@ import {
   users,
   transactions,
   leaderboard,
-} from "../ponder.schema";
+  votes,
+} from "ponder:schema";
+
 import { formatEther } from "viem";
-import { desc, sql } from "ponder";
+import { desc } from "drizzle-orm";
+
 import offchainDatabase from "../offchain.database";
 import { priceTable } from "../offchain.schema";
 import {
-  getFarcasterFids,
-  getDisplayName,
-  sendNotification,
-} from "./helpers/notifications";
-import { getCurrencyByChainId } from "./helpers/price";
-
-const POIDH_BASE_URL = "https://poidh.xyz";
-
-function isLive(block: bigint) {
-  const nowSec = BigInt(Math.floor(Date.now() / 1000));
-  const maxDrift = 60n;
-
-  return nowSec - block <= maxDrift;
-}
+  ChainId,
+  LATEST_BOUNTIES_INDEX,
+  LATEST_CLAIMS_INDEX,
+} from "./helpers/constants";
 
 const [price] = await offchainDatabase
   .select()
@@ -35,247 +29,201 @@ const [price] = await offchainDatabase
 
 ponder.on("PoidhContract:BountyCreated", async ({ event, context }) => {
   const database = context.db;
-  const { id, name, amount, issuer, description } = event.args;
+  const { id, title, isOpenBounty, amount, issuer, description } = event.args;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
+  const chainId = context.chain.id;
+  const bountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(id);
 
   await database
     .insert(users)
     .values({ address: issuer })
     .onConflictDoNothing();
 
-  const isMultiplayer =
-    (
-      await context.client.readContract({
-        abi: context.contracts.PoidhContract.abi,
-        address: context.contracts.PoidhContract.address,
-        functionName: "getParticipants",
-        args: [id],
-      })
-    )[0].length > 0;
-
-  const amountSort =
-    Number(formatEther(amount)) *
-    (context.chain.id === 666666666
-      ? Number(price!.degen_usd)
-      : Number(price!.eth_usd));
+  const amountSort = Number(formatEther(amount)) * priceBasedOnChainId(chainId);
 
   await database.insert(bounties).values({
-    id: Number(id),
-    chainId: context.chain.id,
-    title: name,
+    id: bountyId,
+    chainId,
+    onChainId: Number(id),
+    title,
     createdAt: timestamp,
     description: description,
     amount: amount.toString(),
     amountSort,
     issuer,
-    isMultiplayer,
+    isMultiplayer: isOpenBounty,
   });
 
   await database.insert(participationsBounties).values({
     userAddress: issuer,
-    bountyId: Number(id),
+    bountyId,
     amount: amount.toString(),
-    chainId: context.chain.id,
+    chainId,
   });
 
   await database.insert(transactions).values({
     index: transactionIndex,
     tx: hash,
     address: issuer,
-    bountyId: Number(id),
+    bountyId,
     action: `bounty created`,
-    chainId: context.chain.id,
+    chainId,
     timestamp,
   });
-
-  if (amountSort >= 100 && isLive(event.block.timestamp)) {
-    const creatorName = await getDisplayName(issuer);
-    await sendNotification({
-      title: `💰 NEW $${amountSort.toFixed(0)} BOUNTY 💰`,
-      messageBody: `${name}${creatorName ? ` from ${creatorName}` : ""}`,
-      targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${id}`,
-    });
-  }
 });
 
 ponder.on("PoidhContract:BountyCancelled", async ({ event, context }) => {
   const database = context.db;
-  const { bountyId, issuer } = event.args;
+  const { bountyId, issuer, issuerRefund } = event.args;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
+  const chainId = context.chain.id;
+
+  const newBountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(bountyId);
 
   await database
     .update(bounties, {
-      id: Number(bountyId),
-      chainId: context.chain.id,
+      id: newBountyId,
+      chainId,
     })
     .set({
       isCanceled: true,
       inProgress: false,
+      onChainId: Number(bountyId),
     });
 
   await database.insert(transactions).values({
     index: transactionIndex,
     tx: hash,
     address: issuer,
-    bountyId: Number(bountyId),
+    bountyId: newBountyId,
     action: `bounty canceled`,
-    chainId: context.chain.id,
+    chainId,
     timestamp,
   });
+
+  await database
+    .insert(users)
+    .values({
+      address: issuer,
+      ...updatePriceBasedOnChainId(null, chainId, issuerRefund),
+    })
+    .onConflictDoUpdate((row) =>
+      updatePriceBasedOnChainId(row, chainId, issuerRefund),
+    );
 });
 
 ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
   const database = context.db;
-  const { amount, participant, bountyId } = event.args;
-  const { client, contracts } = context;
+  const { amount, participant, bountyId, latestBountyBalance } = event.args;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
+  const chainId = context.chain.id;
+
+  const newBountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(bountyId);
 
   await database
     .insert(users)
     .values({ address: participant })
     .onConflictDoNothing();
 
-  const [_, __, deadline] = await client.readContract({
-    abi: contracts.PoidhContract.abi,
-    address: contracts.PoidhContract.address,
-    functionName: "bountyVotingTracker",
-    args: [bountyId],
-  });
-
-  const updatedBounty = await database
+  await database
     .update(bounties, {
-      id: Number(bountyId),
-      chainId: context.chain.id,
+      id: newBountyId,
+      chainId,
     })
-    .set((raw) => ({
-      amount: (BigInt(raw.amount) + amount).toString(),
+    .set(() => ({
+      amount: latestBountyBalance.toString(),
       isJoinedBounty: true,
       amountSort:
-        Number(formatEther(BigInt(raw.amount) + amount)) *
-        (context.chain.id === 666666666
-          ? Number(price!.degen_usd)
-          : Number(price!.eth_usd)),
-      deadline: Number(deadline),
+        Number(formatEther(latestBountyBalance)) * priceBasedOnChainId(chainId),
+      onChainId: Number(bountyId),
     }));
 
   await database.insert(participationsBounties).values({
     userAddress: participant,
-    bountyId: Number(bountyId),
+    bountyId: newBountyId,
     amount: amount.toString(),
-    chainId: context.chain.id,
+    chainId,
   });
 
   await database.insert(transactions).values({
     index: transactionIndex,
     tx: hash,
     address: participant,
-    bountyId: Number(bountyId),
+    bountyId: newBountyId,
     action: `+${formatEther(amount)} ${
       context.chain.name === "degen" ? "degen" : "eth"
     }`,
-    chainId: context.chain.id,
+    chainId,
     timestamp,
   });
-
-  if (isLive(event.block.timestamp)) {
-    const joinedAmountUsd =
-      Number(formatEther(BigInt(amount))) *
-      (context.chain.id === 666666666
-        ? Number(price!.degen_usd)
-        : Number(price!.eth_usd));
-    if (
-      updatedBounty.amountSort >= 100 &&
-      updatedBounty.amountSort - joinedAmountUsd < 100
-    ) {
-      const creatorName = await getDisplayName(updatedBounty.issuer);
-      await sendNotification({
-        title: `💰 NEW $${updatedBounty.amountSort.toFixed(0)} BOUNTY 💰`,
-        messageBody: `${updatedBounty.title}${
-          creatorName ? ` from ${creatorName}` : ""
-        }`,
-        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
-      });
-    }
-
-    const bountyParticipants =
-      await database.sql.query.participationsBounties.findMany({
-        where: (table, { and, eq, ne }) =>
-          and(
-            eq(table.bountyId, Number(bountyId)),
-            eq(table.chainId, context.chain.id),
-            ne(table.userAddress, participant)
-          ),
-      });
-    const bountyParticipantsTargetFids = await getFarcasterFids(
-      bountyParticipants.map((p) => p.userAddress)
-    );
-    if (bountyParticipantsTargetFids.length > 0) {
-      const contributorDisplayName = await getDisplayName(participant);
-      const currency = getCurrencyByChainId({ chainId: context.chain.id });
-      await sendNotification({
-        title: "new contribution on poidh 💰",
-        messageBody: `${
-          updatedBounty.title
-        } has received a contribution of ${formatEther(
-          BigInt(amount)
-        )} ${currency.toUpperCase()} from ${contributorDisplayName}`,
-        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
-        targetFIds: bountyParticipantsTargetFids,
-      });
-    }
-  }
 });
 
 ponder.on(
   "PoidhContract:WithdrawFromOpenBounty",
   async ({ event, context }) => {
     const database = context.db;
-    const { amount, participant, bountyId } = event.args;
+    const { amount, participant, bountyId, latestBountyAmount } = event.args;
     const { hash, transactionIndex } = event.transaction;
     const { timestamp } = event.block;
+    const chainId = context.chain.id;
+
+    const newBountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(bountyId);
 
     await database
       .update(bounties, {
-        id: Number(bountyId),
-        chainId: context.chain.id,
+        id: newBountyId,
+        chainId,
       })
       .set((raw) => ({
-        amount: (BigInt(raw.amount) - amount).toString(),
+        amount: latestBountyAmount.toString(),
         amountSort:
-          Number(formatEther(BigInt(raw.amount) - amount)) *
-          (context.chain.id === 666666666
-            ? Number(price!.degen_usd)
-            : Number(price!.eth_usd)),
+          Number(formatEther(latestBountyAmount)) *
+          priceBasedOnChainId(chainId),
+        onChainId: Number(bountyId),
       }));
 
     await database.delete(participationsBounties, {
-      bountyId: Number(bountyId),
+      bountyId: newBountyId,
       userAddress: participant,
-      chainId: context.chain.id,
+      chainId,
     });
 
     await database.insert(transactions).values({
       index: transactionIndex,
       tx: hash,
       address: participant,
-      bountyId: Number(bountyId),
+      bountyId: newBountyId,
       action: `-${formatEther(amount)} ${
         context.chain.name === "degen" ? "degen" : "eth"
       }`,
-      chainId: context.chain.id,
+      chainId,
       timestamp,
     });
-  }
+
+    await database
+      .insert(users)
+      .values({
+        address: participant,
+        ...updatePriceBasedOnChainId(null, chainId, amount),
+      })
+      .onConflictDoUpdate((row) =>
+        updatePriceBasedOnChainId(row, chainId, amount),
+      );
+  },
 );
 
 ponder.on("PoidhContract:ClaimCreated", async ({ event, context }) => {
   const database = context.db;
-  const { bountyId, description, id, issuer, name } = event.args;
+  const { bountyId, description, id, issuer, title, imageUri } = event.args;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
+  const chainId = context.chain.id;
+
+  const newBountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(bountyId);
+  const newClaimId = LATEST_CLAIMS_INDEX[chainId] + Number(id);
 
   await database
     .insert(users)
@@ -285,83 +233,67 @@ ponder.on("PoidhContract:ClaimCreated", async ({ event, context }) => {
   await database
     .insert(claims)
     .values({
-      id: Number(id),
-      chainId: context.chain.id,
-      title: name,
+      id: newClaimId,
+      chainId,
+      onChainId: Number(id),
+      bountyId: newBountyId,
+      title,
       description,
-      url: "",
+      url: imageUri,
       issuer,
-      bountyId: Number(bountyId),
       owner: context.contracts.PoidhContract.address!,
     })
     .onConflictDoUpdate({
-      title: name,
+      bountyId: newBountyId,
+      title,
       description,
       issuer,
-      bountyId: Number(bountyId),
+      url: imageUri,
+      onChainId: Number(id),
     });
 
   await database.insert(transactions).values({
     index: transactionIndex,
     tx: hash,
     address: issuer,
-    bountyId: Number(bountyId),
-    claimId: Number(id),
+    bountyId: newBountyId,
+    claimId: newClaimId,
     action: "claim created",
-    chainId: context.chain.id,
+    chainId,
     timestamp,
   });
-
-  if (isLive(event.block.timestamp)) {
-    const contributors =
-      await database.sql.query.participationsBounties.findMany({
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.bountyId, Number(bountyId)),
-            eq(table.chainId, context.chain.id)
-          ),
-      });
-
-    const targetFIds = await getFarcasterFids(
-      contributors.map((c) => c.userAddress)
-    );
-    if (targetFIds.length > 0) {
-      const claimCreatorName = await getDisplayName(issuer);
-      const bounty = await database.sql.query.bounties.findFirst({
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.id, Number(bountyId)),
-            eq(table.chainId, context.chain.id)
-          ),
-      });
-
-      await sendNotification({
-        title: "new claim on poidh 🖼️",
-        messageBody: `${bounty?.title} has received a new claim from ${claimCreatorName}`,
-        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${bountyId}`,
-        targetFIds,
-      });
-    }
-  }
 });
 
 ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
   const database = context.db;
-  const { claimId, claimIssuer } = event.args;
+  const { claimId, bountyIssuer, claimIssuer, payout } = event.args;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
 
-  const bountyId = Number(event.args.bountyId);
   const chainId = context.chain.id;
+  const onChainBountyId = Number(event.args.bountyId);
+  const bountyId = LATEST_BOUNTIES_INDEX[chainId] + onChainBountyId;
+  const newClaimId = LATEST_CLAIMS_INDEX[chainId] + Number(claimId);
 
   await database
     .update(claims, {
-      id: Number(claimId),
-      chainId: context.chain.id,
+      id: newClaimId,
+      chainId,
     })
     .set({
       isAccepted: true,
+      onChainId: Number(claimId),
     });
+
+  await database
+    .insert(users)
+    .values({
+      address: claimIssuer,
+      ...updatePriceBasedOnChainId(null, chainId, payout),
+    })
+    .onConflictDoUpdate((row) =>
+      updatePriceBasedOnChainId(row, chainId, payout),
+    );
 
   const bounty = await database
     .update(bounties, {
@@ -370,12 +302,13 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
     })
     .set({
       inProgress: false,
+      onChainId: onChainBountyId,
     });
 
   await database.insert(transactions).values({
     index: transactionIndex,
     tx: hash,
-    address: claimIssuer,
+    address: bountyIssuer,
     bountyId,
     action: "claim accepted",
     chainId,
@@ -387,6 +320,7 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
       where: (table, { and, eq }) =>
         and(eq(table.bountyId, bountyId), eq(table.chainId, chainId)),
     });
+
   await database.sql
     .insert(leaderboard)
     .values({
@@ -398,7 +332,7 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
       target: [leaderboard.address, leaderboard.chainId],
       set: {
         earned: sql`${leaderboard.earned} + ${Number(
-          formatEther(BigInt(bounty.amount))
+          formatEther(BigInt(bounty.amount)),
         )}`,
       },
     });
@@ -419,187 +353,209 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
             paid: sql`${leaderboard.paid} + ${paid}`,
           },
         });
-    })
+    }),
   );
-
-  if (isLive(event.block.timestamp)) {
-    const targetFIds = await getFarcasterFids([claimIssuer.toLowerCase()]);
-    if (targetFIds.length > 0) {
-      const creatorName = await getDisplayName(bounty.issuer);
-      await sendNotification({
-        title: "you won a bounty! 🏆",
-        messageBody: `you're the winner of ${bounty.title} from ${creatorName} - bounty funds have been transferred to your wallet`,
-        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${bounty.id}`,
-        targetFIds: targetFIds,
-      });
-    }
-  }
 });
 
-ponder.on("PoidhContract:ResetVotingPeriod", async ({ event, context }) => {
+ponder.on("PoidhContract:VotingResolved", async ({ event, context }) => {
   const database = context.db;
-  const { bountyId } = event.args;
-  const { client, contracts } = context;
+  const { bountyId, passed } = event.args;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
+  const chainId = context.chain.id;
 
-  const [_, __, deadline] = await client.readContract({
-    abi: contracts.PoidhContract.abi,
-    address: contracts.PoidhContract.address,
-    functionName: "bountyVotingTracker",
-    args: [bountyId],
-  });
+  const newBountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(bountyId);
 
   await database
     .update(bounties, {
-      id: Number(bountyId),
-      chainId: context.chain.id,
+      id: newBountyId,
+      chainId,
     })
     .set({
-      deadline: Number(deadline),
       isVoting: false,
-      inProgress: true,
+      inProgress: !passed,
+      onChainId: Number(bountyId),
     });
 
   await database.insert(transactions).values({
     index: transactionIndex,
     tx: hash,
     address: "0x0",
-    bountyId: Number(bountyId),
+    bountyId: newBountyId,
     action: "voting reset period",
-    chainId: context.chain.id,
+    chainId,
     timestamp,
   });
 });
 
-ponder.on("PoidhContract:ClaimSubmittedForVote", async ({ event, context }) => {
+ponder.on("PoidhContract:VotingStarted", async ({ event, context }) => {
   const database = context.db;
-  const { bountyId, claimId } = event.args;
-  const { client, contracts } = context;
+  const { bountyId, claimId, deadline, round } = event.args;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
+  const chainId = context.chain.id;
 
-  const [_, __, deadline] = await client.readContract({
-    abi: contracts.PoidhContract.abi,
-    address: contracts.PoidhContract.address,
-    functionName: "bountyVotingTracker",
-    args: [bountyId],
-    blockNumber: event.block.number,
-  });
+  const newBountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(bountyId);
+  const newClaimId = LATEST_CLAIMS_INDEX[chainId] + Number(claimId);
 
-  const updatedBounty = await database
+  await database
     .update(bounties, {
-      id: Number(bountyId),
-      chainId: context.chain.id,
+      id: newBountyId,
+      chainId,
     })
     .set({
       isVoting: true,
       deadline: Number(deadline),
+      onChainId: Number(bountyId),
     });
+
+  await database.insert(votes).values({
+    bountyId: newBountyId,
+    chainId,
+    claimId: newClaimId,
+    no: 0,
+    yes: 0,
+    round: Number(round),
+  });
 
   await database.insert(transactions).values({
     index: transactionIndex,
     tx: hash,
-    address: updatedBounty.issuer,
-    bountyId: Number(bountyId),
-    action: `${claimId} submitted for vote`,
-    chainId: context.chain.id,
+    address: "0x0",
+    bountyId: newBountyId,
+    action: `${newClaimId} submitted for vote`,
+    chainId,
     timestamp,
   });
-
-  if (isLive(timestamp)) {
-    const submittedClaim = await database.sql.query.claims.findFirst({
-      where: (table, { and, eq }) =>
-        and(eq(table.id, Number(claimId)), eq(table.chainId, context.chain.id)),
-    });
-    if (!submittedClaim) return;
-
-    const nominatedUserTargetFids = await getFarcasterFids([
-      submittedClaim.issuer,
-    ]);
-    if (nominatedUserTargetFids.length > 0) {
-      await sendNotification({
-        title: `your claim is nominated 🗳️`,
-        messageBody: `your claim is up for vote for ${updatedBounty.title} - contributors will now vote to confirm`,
-        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
-        targetFIds: nominatedUserTargetFids,
-      });
-    }
-
-    const bountyIssuerDisplayName = await getDisplayName(updatedBounty.issuer);
-
-    const bountyParticipants =
-      await database.sql.query.participationsBounties.findMany({
-        where: (table, { and, eq, ne }) =>
-          and(
-            eq(table.bountyId, Number(bountyId)),
-            eq(table.chainId, context.chain.id),
-            ne(table.userAddress, updatedBounty.issuer)
-          ),
-      });
-    const bountyParticipantsTargetFids = await getFarcasterFids(
-      bountyParticipants.map((p) => p.userAddress)
-    );
-    if (bountyParticipantsTargetFids.length > 0) {
-      await sendNotification({
-        title: `your vote is needed 🗳️`,
-        messageBody: `${bountyIssuerDisplayName} has proposed a winner for ${updatedBounty.title} - you have 48 hours to vote`,
-        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
-        targetFIds: bountyParticipantsTargetFids,
-      });
-    }
-
-    const allBountyClaims = await database.sql
-      .selectDistinctOn([claims.issuer])
-      .from(claims)
-      .where(
-        sql`${claims.bountyId} = ${bountyId} and ${claims.chainId} = ${context.chain.id} and not lower(${claims.issuer}) = lower(${submittedClaim.issuer})`
-      );
-    const claimIssuerFIds = await getFarcasterFids(
-      allBountyClaims.map((c) => c.issuer)
-    );
-    if (claimIssuerFIds.length > 0) {
-      await sendNotification({
-        title: `your claim was not nominated`,
-        messageBody: `${bountyIssuerDisplayName} has proposed a winner for ${updatedBounty.title} - your claim was not selected`,
-        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
-        targetFIds: claimIssuerFIds,
-      });
-    }
-  }
 });
 
-ponder.on("PoidhContract:VoteClaim", async ({ event, context }) => {
+ponder.on("PoidhContract:VoteCast", async ({ event, context }) => {
   const database = context.db;
-  const { bountyId, claimId, voter } = event.args;
-  const { client, contracts } = context;
+  const { bountyId, voter, support } = event.args;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
+  const chainId = context.chain.id;
 
-  const [_, __, deadline] = await client.readContract({
-    abi: contracts.PoidhContract.abi,
-    address: contracts.PoidhContract.address,
-    functionName: "bountyVotingTracker",
-    args: [bountyId],
-    blockNumber: event.block.number,
+  const newBountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(bountyId);
+
+  const latestVoteRound = await database.sql.query.votes.findFirst({
+    where: (table, { and, eq }) =>
+      and(eq(table.bountyId, newBountyId), eq(table.chainId, chainId)),
+    orderBy: (table, { desc }) => [desc(table.round)],
   });
 
   await database
-    .update(bounties, {
-      id: Number(bountyId),
-      chainId: context.chain.id,
+    .update(votes, {
+      bountyId: newBountyId,
+      chainId,
+      round: latestVoteRound!.round,
     })
-    .set({
-      deadline: Number(deadline),
-    });
+    .set((row) => ({
+      yes: support ? row.yes + 1 : row.yes,
+      no: support ? row.no : row.no + 1,
+    }));
 
   await database.insert(transactions).values({
     index: transactionIndex,
     tx: hash,
     address: voter,
-    bountyId: Number(bountyId),
+    bountyId: newBountyId,
     action: `voted`,
-    chainId: context.chain.id,
+    chainId,
     timestamp,
   });
 });
+
+ponder.on("PoidhContract:RefundClaimed", async ({ event, context }) => {
+  const { amount, participant } = event.args;
+  const chainId = context.chain.id;
+  const database = context.db;
+
+  await database
+    .insert(users)
+    .values({
+      address: participant,
+      ...updatePriceBasedOnChainId(null, chainId, amount),
+    })
+    .onConflictDoUpdate((row) =>
+      updatePriceBasedOnChainId(row, chainId, amount),
+    );
+});
+
+ponder.on("PoidhContract:Withdrawal", async ({ event, context }) => {
+  const { user } = event.args;
+  const chainId = context.chain.id;
+  const database = context.db;
+
+  await database
+    .insert(users)
+    .values({
+      address: user,
+      ...withdrawBasedOnChainId(chainId),
+    })
+    .onConflictDoUpdate(withdrawBasedOnChainId(chainId));
+});
+
+ponder.on("PoidhContract:WithdrawalTo", async ({ event, context }) => {
+  const { to } = event.args;
+  const chainId = context.chain.id;
+  const database = context.db;
+
+  await database
+    .insert(users)
+    .values({
+      address: to,
+      ...withdrawBasedOnChainId(chainId),
+    })
+    .onConflictDoUpdate(withdrawBasedOnChainId(chainId));
+});
+
+function priceBasedOnChainId(chainId: number) {
+  return chainId === 666666666
+    ? Number(price!.degen_usd)
+    : Number(price!.eth_usd);
+}
+
+function updatePriceBasedOnChainId(
+  row: {
+    address: `0x${string}`;
+    withdrawalAmountDegen: number | null;
+    withdrawalAmountBase: number | null;
+    withdrawalAmountArbitrum: number | null;
+  } | null,
+  chainId: ChainId,
+  payout: bigint,
+) {
+  const amountParsed = Number(formatEther(payout));
+
+  if (chainId === 8453) {
+    return {
+      withdrawalAmountBase: (row?.withdrawalAmountBase ?? 0) + amountParsed,
+    };
+  }
+  if (chainId === 666666666) {
+    return {
+      withdrawalAmountDegen: (row?.withdrawalAmountDegen ?? 0) + amountParsed,
+    };
+  }
+  return {
+    withdrawalAmountArbitrum:
+      (row?.withdrawalAmountArbitrum ?? 0) + amountParsed,
+  };
+}
+
+function withdrawBasedOnChainId(chainId: ChainId) {
+  if (chainId === 8453) {
+    return {
+      withdrawalAmountBase: 0,
+    };
+  }
+  if (chainId === 666666666) {
+    return {
+      withdrawalAmountDegen: 0,
+    };
+  }
+  return {
+    withdrawalAmountArbitrum: 0,
+  };
+}

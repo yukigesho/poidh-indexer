@@ -6,7 +6,7 @@ type FarcasterUser = {
 };
 
 export async function getFarcasterUsers(
-  addresses: string[]
+  addresses: string[],
 ): Promise<Record<string, FarcasterUser[]>> {
   try {
     if (!NEYNAR_API_KEY) {
@@ -14,7 +14,7 @@ export async function getFarcasterUsers(
     }
 
     const url = `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${addresses.join(
-      ","
+      ",",
     )}`;
     const options = {
       method: "GET",
@@ -82,13 +82,13 @@ export async function sendNotification({
 
 export async function getFarcasterFids(addresses: string[]): Promise<number[]> {
   const farcasterUsers = await getFarcasterUsers(
-    addresses.map((a) => a.toLowerCase())
+    addresses.map((a) => a.toLowerCase()),
   );
   return Object.values(farcasterUsers)
     .map((u) =>
       Array.isArray(u)
         ? (u[0] as { fid?: number } | null)
-        : (u as { fid?: number } | null)
+        : (u as { fid?: number } | null),
     )
     .filter((u): u is { fid: number } => u != null && typeof u.fid === "number")
     .map((u) => u.fid);

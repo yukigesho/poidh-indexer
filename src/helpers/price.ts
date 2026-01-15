@@ -5,7 +5,7 @@ export async function fetchPrice({ currency }: { currency: Currency }) {
   while (true) {
     try {
       const response = await fetch(
-        `https://api.coinbase.com/v2/exchange-rates?currency=${currency}`
+        `https://api.coinbase.com/v2/exchange-rates?currency=${currency}`,
       );
       const body = await response.json();
       const price = (body as any).data.rates.USD;
