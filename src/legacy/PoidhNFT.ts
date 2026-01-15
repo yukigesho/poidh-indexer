@@ -20,8 +20,8 @@ ponder.on("LegacyPoidhNFTContract:Transfer", async ({ event, context }) => {
   }
 
   const url = await context.client.readContract({
-    abi: context.contracts.PoidhNFTContract.abi,
-    address: context.contracts.PoidhNFTContract.address,
+    abi: context.contracts.LegacyPoidhNFTContract.abi,
+    address: context.contracts.LegacyPoidhNFTContract.address,
     functionName: "tokenURI",
     args: [tokenId],
     blockNumber: event.block.number,
