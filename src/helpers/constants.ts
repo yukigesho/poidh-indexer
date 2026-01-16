@@ -4,9 +4,9 @@ export const ARBITRUM_LAST_BOUNTY = 180;
 export const DEGEN_LAST_BOUNTY = 1197;
 export const BASE_LAST_BOUNTY = 986;
 
-export const ARBITRUM_LAST_CLAIM = 435;
-export const DEGEN_LAST_CLAIM = 4533;
-export const BASE_LAST_CLAIM = 5317;
+export const ARBITRUM_LAST_CLAIM = 434;
+export const DEGEN_LAST_CLAIM = 4532;
+export const BASE_LAST_CLAIM = 5316;
 
 export type ChainId = 42161 | 8453 | 666666666;
 

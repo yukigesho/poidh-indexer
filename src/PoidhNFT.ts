@@ -8,16 +8,17 @@ ponder.on("PoidhNFTContract:Transfer", async ({ event, context }) => {
   const { to, tokenId, from } = event.args;
 
   const chainId = context.chain.id;
-  const newTokenId = LATEST_CLAIMS_INDEX[chainId] + Number(tokenId);
+  const newToketId = LATEST_CLAIMS_INDEX[chainId] + Number(tokenId);
 
   await database
     .update(claims, {
       chainId,
-      id: newTokenId,
+      id: newToketId,
     })
     .set({
       owner: to,
-    });
+    })
+    .catch(() => {});
 
   if (!IGNORE_ADDRESSES.includes(to.toLowerCase())) {
     await database.insert(users).values({ address: to }).onConflictDoNothing();
