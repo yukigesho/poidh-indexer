@@ -36,8 +36,8 @@ export const votes = onchainTable(
     chainId: t.integer().notNull(),
     bountyId: t.integer().notNull(),
     claimId: t.integer().notNull(),
-    yes: t.integer().notNull(),
-    no: t.integer().notNull(),
+    yes: t.bigint().notNull(),
+    no: t.bigint().notNull(),
     round: t.integer().notNull(),
   }),
   (table) => ({

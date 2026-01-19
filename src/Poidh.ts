@@ -390,7 +390,7 @@ ponder.on("PoidhContract:VotingResolved", async ({ event, context }) => {
 
 ponder.on("PoidhContract:VotingStarted", async ({ event, context }) => {
   const database = context.db;
-  const { bountyId, claimId, deadline, round } = event.args;
+  const { bountyId, claimId, deadline, round, issuerYesWeight } = event.args;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
   const chainId = context.chain.id;
@@ -413,8 +413,8 @@ ponder.on("PoidhContract:VotingStarted", async ({ event, context }) => {
     bountyId: newBountyId,
     chainId,
     claimId: newClaimId,
-    no: 0,
-    yes: 0,
+    no: 0n,
+    yes: issuerYesWeight,
     round: Number(round),
   });
 
@@ -431,7 +431,7 @@ ponder.on("PoidhContract:VotingStarted", async ({ event, context }) => {
 
 ponder.on("PoidhContract:VoteCast", async ({ event, context }) => {
   const database = context.db;
-  const { bountyId, voter, support } = event.args;
+  const { bountyId, voter, support, weight } = event.args;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
   const chainId = context.chain.id;
@@ -451,8 +451,8 @@ ponder.on("PoidhContract:VoteCast", async ({ event, context }) => {
       round: latestVoteRound!.round,
     })
     .set((row) => ({
-      yes: support ? row.yes + 1 : row.yes,
-      no: support ? row.no : row.no + 1,
+      yes: support ? row.yes + weight : row.yes,
+      no: support ? row.no : row.no + weight,
     }));
 
   await database.insert(transactions).values({
