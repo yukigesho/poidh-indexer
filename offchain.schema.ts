@@ -1,8 +1,10 @@
 import {
+  json,
   numeric,
   pgSchema,
   pgTable,
   serial,
+  text,
   timestamp,
 } from "drizzle-orm/pg-core";
 
@@ -24,6 +26,18 @@ const priceTableSchema = {
   }).notNull(),
 };
 
+const notificationsTableSchema = {
+  id: serial().primaryKey(),
+  created_at: timestamp().defaultNow(),
+  event: text().notNull(),
+  data: json().notNull(),
+  send_at: timestamp(),
+};
+
 export const priceTable = offchainSchema
   ? offchainSchema.table("Price", priceTableSchema)
   : pgTable("Price", priceTableSchema);
+
+export const notificationsTable = offchainSchema
+  ? offchainSchema.table("Notifications", notificationsTableSchema)
+  : pgTable("Notifications", notificationsTableSchema);
