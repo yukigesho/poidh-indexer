@@ -29,16 +29,16 @@ export default createConfig({
       abi: PoidhV3Abi,
       chain: {
         base: {
-          address: "0xF3872201171A0fF0a6e789627583E8036C41Baec",
-          startBlock: 40678285,
+          address: "0x5555fa783936c260f77385b4e153b9725fef1719",
+          startBlock: 41026079,
         },
         degen: {
-          address: "0x0285626130C127741C18C7730625ca624B727DC3",
-          startBlock: 26628691,
+          address: "0x18e5585ca7ce31b90bc8bb7aaf84152857ce243f",
+          startBlock: 26638629,
         },
         arbitrum: {
-          address: "0xF3872201171A0fF0a6e789627583E8036C41Baec",
-          startBlock: 420277040,
+          address: "0x5555fa783936c260f77385b4e153b9725fef1719",
+          startBlock: 423059298,
         },
       },
     },
@@ -47,16 +47,16 @@ export default createConfig({
       abi: PoidhClaimNFTAbi,
       chain: {
         base: {
-          address: "0x18E5585ca7cE31b90Bc8BB7aAf84152857cE243f",
-          startBlock: 40678285,
+          address: "0x27E117Cc9A8DA363442e7Bd0618939E3EEEACF6A",
+          startBlock: 41026079,
         },
         degen: {
-          address: "0xc43e1ab1f0e9daf37Ba532D06A9Fc713AA999A96",
-          startBlock: 26628691,
+          address: "0x39f04b7897dcaf9dc454e433f43fb1c3bb528e11",
+          startBlock: 26638628,
         },
         arbitrum: {
-          address: "0x18E5585ca7cE31b90Bc8BB7aAf84152857cE243f",
-          startBlock: 420277024,
+          address: "0x27E117Cc9A8DA363442e7Bd0618939E3EEEACF6A",
+          startBlock: 423059286,
         },
       },
     },

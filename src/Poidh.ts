@@ -431,24 +431,18 @@ ponder.on("PoidhContract:VotingStarted", async ({ event, context }) => {
 
 ponder.on("PoidhContract:VoteCast", async ({ event, context }) => {
   const database = context.db;
-  const { bountyId, voter, support, weight } = event.args;
+  const { bountyId, voter, support, weight, round } = event.args;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
   const chainId = context.chain.id;
 
   const newBountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(bountyId);
 
-  const latestVoteRound = await database.sql.query.votes.findFirst({
-    where: (table, { and, eq }) =>
-      and(eq(table.bountyId, newBountyId), eq(table.chainId, chainId)),
-    orderBy: (table, { desc }) => [desc(table.round)],
-  });
-
   await database
     .update(votes, {
       bountyId: newBountyId,
       chainId,
-      round: latestVoteRound!.round,
+      round: Number(round),
     })
     .set((row) => ({
       yes: support ? row.yes + weight : row.yes,
