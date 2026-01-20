@@ -20,6 +20,7 @@ import {
 } from "./helpers/constants";
 import { isLive } from "./helpers/utils";
 import { getCurrencyByChainId } from "./helpers/price";
+import type { NotificationEventPayload } from "./helpers/types";
 
 const [price] = await offchainDatabase
   .select()
@@ -749,13 +750,7 @@ function withdrawBasedOnChainId(chainId: ChainId) {
   };
 }
 
-async function emitEvent({
-  event,
-  data,
-}: {
-  event: string;
-  data: Record<string, any>;
-}) {
+async function emitEvent({ event, data }: NotificationEventPayload) {
   await offchainDatabase.insert(notificationsTable).values({
     data,
     event,
