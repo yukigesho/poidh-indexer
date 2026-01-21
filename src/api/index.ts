@@ -13,17 +13,6 @@ app.use("/graphql", graphql({ db, schema }));
 
 app.get("/swagger", swaggerUI({ url: "/openapi/doc" }));
 
-app.get("/deployment_id", async (c) => {
-  const deploymentId = process.env.RAILWAY_DEPLOYMENT_ID;
-  if (!deploymentId) {
-    return c.status(404);
-  }
-
-  return c.json({
-    deploymentId,
-  });
-});
-
 app.get("/bounty/:chainId", async (c) => {
   const chainId = Number(c.req.param("chainId") ?? 0);
 
