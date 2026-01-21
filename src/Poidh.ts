@@ -10,23 +10,22 @@ import {
   votes,
 } from "ponder:schema";
 import { formatEther } from "viem";
-import { desc } from "drizzle-orm";
 import offchainDatabase from "../offchain.database";
-import { notificationsTable, priceTable } from "../offchain.schema";
+import { bountyExtraTable, notificationsTable } from "../offchain.schema";
 import {
   ChainId,
   LATEST_BOUNTIES_INDEX,
   LATEST_CLAIMS_INDEX,
 } from "./helpers/constants";
 import { isLive } from "./helpers/utils";
-import { getCurrencyByChainId } from "./helpers/price";
+import {
+  getCurrencyByChainId,
+  loadLatestPrice,
+  priceBasedOnChainId,
+} from "./helpers/price";
 import type { NotificationEventPayload } from "./helpers/types";
 
-const [price] = await offchainDatabase
-  .select()
-  .from(priceTable)
-  .orderBy(desc(priceTable.id))
-  .limit(1);
+await loadLatestPrice();
 
 ponder.on("PoidhContract:BountyCreated", async ({ event, context }) => {
   const database = context.db;
@@ -51,10 +50,23 @@ ponder.on("PoidhContract:BountyCreated", async ({ event, context }) => {
     createdAt: timestamp,
     description: description,
     amount: amount.toString(),
-    amountSort,
     issuer,
     isMultiplayer: isOpenBounty,
   });
+
+  await offchainDatabase
+    .insert(bountyExtraTable)
+    .values({
+      bounty_id: bounty.id,
+      chain_id: chainId,
+      amount_sort: amountSort,
+    })
+    .onConflictDoUpdate({
+      target: [bountyExtraTable.bounty_id, bountyExtraTable.chain_id],
+      set: {
+        amount_sort: amountSort,
+      },
+    });
 
   await database.insert(participationsBounties).values({
     userAddress: issuer,
@@ -74,20 +86,19 @@ ponder.on("PoidhContract:BountyCreated", async ({ event, context }) => {
   });
 
   if (isLive(event.block.timestamp)) {
-    const { amountSort, ...bountyData } = bounty;
     const currency = getCurrencyByChainId({ chainId });
 
     await emitEvent({
       event: "BountyCreated",
       data: {
-        ...bountyData,
-        createdAt: Number(bountyData.createdAt),
+        ...bounty,
+        createdAt: Number(bounty.createdAt),
         amount: amountSort,
-        inProgress: bountyData.inProgress ?? false,
-        isJoinedBounty: bountyData.isJoinedBounty ?? false,
-        isCanceled: bountyData.isCanceled ?? false,
-        isMultiplayer: bountyData.isMultiplayer ?? false,
-        isVoting: bountyData.isVoting ?? false,
+        inProgress: bounty.inProgress ?? false,
+        isJoinedBounty: bounty.isJoinedBounty ?? false,
+        isCanceled: bounty.isCanceled ?? false,
+        isMultiplayer: bounty.isMultiplayer ?? false,
+        isVoting: bounty.isVoting ?? false,
         currency,
       },
     });
@@ -143,6 +154,8 @@ ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
   const chainId = context.chain.id;
 
   const newBountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(bountyId);
+  const amountSort =
+    Number(formatEther(latestBountyBalance)) * priceBasedOnChainId(chainId);
 
   await database
     .insert(users)
@@ -157,10 +170,22 @@ ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
     .set(() => ({
       amount: latestBountyBalance.toString(),
       isJoinedBounty: true,
-      amountSort:
-        Number(formatEther(latestBountyBalance)) * priceBasedOnChainId(chainId),
       onChainId: Number(bountyId),
     }));
+
+  await offchainDatabase
+    .insert(bountyExtraTable)
+    .values({
+      bounty_id: bounty.id,
+      chain_id: chainId,
+      amount_sort: amountSort,
+    })
+    .onConflictDoUpdate({
+      target: [bountyExtraTable.bounty_id, bountyExtraTable.chain_id],
+      set: {
+        amount_sort: amountSort,
+      },
+    });
 
   await database.insert(participationsBounties).values({
     userAddress: participant,
@@ -182,7 +207,6 @@ ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
   });
 
   if (isLive(event.block.timestamp)) {
-    const { amountSort, ...bountyData } = bounty;
     const currency = getCurrencyByChainId({ chainId });
 
     const bountyParticipants =
@@ -207,14 +231,14 @@ ponder.on("PoidhContract:BountyJoined", async ({ event, context }) => {
           amount: Number(formatEther(amount)) * priceBasedOnChainId(chainId),
         },
         bounty: {
-          ...bountyData,
+          ...bounty,
           amount: amountSort,
-          createdAt: Number(bountyData.createdAt),
-          inProgress: bountyData.inProgress ?? false,
-          isJoinedBounty: bountyData.isJoinedBounty ?? false,
-          isCanceled: bountyData.isCanceled ?? false,
-          isMultiplayer: bountyData.isMultiplayer ?? false,
-          isVoting: bountyData.isVoting ?? false,
+          createdAt: Number(bounty.createdAt),
+          inProgress: bounty.inProgress ?? false,
+          isJoinedBounty: bounty.isJoinedBounty ?? false,
+          isCanceled: bounty.isCanceled ?? false,
+          isMultiplayer: bounty.isMultiplayer ?? false,
+          isVoting: bounty.isVoting ?? false,
           participants: bountyParticipants.map((p) => p.userAddress),
           currency,
         },
@@ -233,19 +257,27 @@ ponder.on(
     const chainId = context.chain.id;
 
     const newBountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(bountyId);
+    const amountSort =
+      Number(formatEther(latestBountyAmount)) * priceBasedOnChainId(chainId);
 
-    await database
+    const bounty = await database
       .update(bounties, {
         id: newBountyId,
         chainId,
       })
       .set((raw) => ({
         amount: latestBountyAmount.toString(),
-        amountSort:
-          Number(formatEther(latestBountyAmount)) *
-          priceBasedOnChainId(chainId),
         onChainId: Number(bountyId),
       }));
+
+    await offchainDatabase
+      .insert(bountyExtraTable)
+      .values({
+        bounty_id: bounty.id,
+        chain_id: chainId,
+        amount_sort: amountSort,
+      })
+      .onConflictDoNothing();
 
     await database.delete(participationsBounties, {
       bountyId: newBountyId,
@@ -346,20 +378,22 @@ ponder.on("PoidhContract:ClaimCreated", async ({ event, context }) => {
       });
 
     const currency = getCurrencyByChainId({ chainId });
-    const { amountSort, ...bountyData } = bounty;
+
+    const amountSort =
+      Number(formatEther(BigInt(bounty.amount))) * priceBasedOnChainId(chainId);
 
     await emitEvent({
       event: "ClaimCreated",
       data: {
         bounty: {
-          ...bountyData,
+          ...bounty,
           amount: amountSort,
-          createdAt: Number(bountyData.createdAt),
-          inProgress: bountyData.inProgress ?? false,
-          isJoinedBounty: bountyData.isJoinedBounty ?? false,
-          isCanceled: bountyData.isCanceled ?? false,
-          isMultiplayer: bountyData.isMultiplayer ?? false,
-          isVoting: bountyData.isVoting ?? false,
+          createdAt: Number(bounty.createdAt),
+          inProgress: bounty.inProgress ?? false,
+          isJoinedBounty: bounty.isJoinedBounty ?? false,
+          isCanceled: bounty.isCanceled ?? false,
+          isMultiplayer: bounty.isMultiplayer ?? false,
+          isVoting: bounty.isVoting ?? false,
           participants: participants.map((p) => p.userAddress),
           currency,
         },
@@ -471,20 +505,22 @@ ponder.on("PoidhContract:ClaimAccepted", async ({ event, context }) => {
 
   if (isLive(event.block.timestamp)) {
     const currency = getCurrencyByChainId({ chainId });
-    const { amountSort, ...bountyData } = bounty;
+
+    const amountSort =
+      Number(formatEther(BigInt(bounty.amount))) * priceBasedOnChainId(chainId);
 
     await emitEvent({
       event: "ClaimAccepted",
       data: {
         bounty: {
-          ...bountyData,
+          ...bounty,
           amount: amountSort,
-          createdAt: Number(bountyData.createdAt),
-          inProgress: bountyData.inProgress ?? false,
-          isJoinedBounty: bountyData.isJoinedBounty ?? false,
-          isCanceled: bountyData.isCanceled ?? false,
-          isMultiplayer: bountyData.isMultiplayer ?? false,
-          isVoting: bountyData.isVoting ?? false,
+          createdAt: Number(bounty.createdAt),
+          inProgress: bounty.inProgress ?? false,
+          isJoinedBounty: bounty.isJoinedBounty ?? false,
+          isCanceled: bounty.isCanceled ?? false,
+          isMultiplayer: bounty.isMultiplayer ?? false,
+          isVoting: bounty.isVoting ?? false,
           participants: participations.map((p) => p.userAddress),
           currency,
         },
@@ -580,15 +616,16 @@ ponder.on("PoidhContract:VotingStarted", async ({ event, context }) => {
     }
 
     const currency = getCurrencyByChainId({ chainId: context.chain.id });
-    const { amountSort, ...bountyData } = bounty;
+    const amountSort =
+      Number(formatEther(BigInt(bounty.amount))) * priceBasedOnChainId(chainId);
 
     const participations =
       await database.sql.query.participationsBounties.findMany({
         where: (table, { and, eq, ne }) =>
           and(
-            eq(table.bountyId, bountyData.id),
+            eq(table.bountyId, bounty.id),
             eq(table.chainId, chainId),
-            ne(table.userAddress, bountyData.issuer),
+            ne(table.userAddress, bounty.issuer),
           ),
       });
 
@@ -596,21 +633,21 @@ ponder.on("PoidhContract:VotingStarted", async ({ event, context }) => {
       .selectDistinctOn([claims.issuer])
       .from(claims)
       .where(
-        sql`${claims.bountyId} = ${bountyData.id} AND ${claims.chainId} = ${chainId} AND ${claims.isVoting} IS FALSE`,
+        sql`${claims.bountyId} = ${bounty.id} AND ${claims.chainId} = ${chainId} AND ${claims.isVoting} IS FALSE`,
       );
 
     await emitEvent({
       event: "VotingStarted",
       data: {
         bounty: {
-          ...bountyData,
+          ...bounty,
           amount: amountSort,
-          createdAt: Number(bountyData.createdAt),
-          inProgress: bountyData.inProgress ?? false,
-          isJoinedBounty: bountyData.isJoinedBounty ?? false,
-          isCanceled: bountyData.isCanceled ?? false,
-          isMultiplayer: bountyData.isMultiplayer ?? false,
-          isVoting: bountyData.isVoting ?? false,
+          createdAt: Number(bounty.createdAt),
+          inProgress: bounty.inProgress ?? false,
+          isJoinedBounty: bounty.isJoinedBounty ?? false,
+          isCanceled: bounty.isCanceled ?? false,
+          isMultiplayer: bounty.isMultiplayer ?? false,
+          isVoting: bounty.isVoting ?? false,
           participants: participations.map((p) => p.userAddress),
           currency,
         },
@@ -699,12 +736,6 @@ ponder.on("PoidhContract:WithdrawalTo", async ({ event, context }) => {
     })
     .onConflictDoUpdate(withdrawBasedOnChainId(chainId));
 });
-
-function priceBasedOnChainId(chainId: number) {
-  return chainId === 666666666
-    ? Number(price!.degen_usd)
-    : Number(price!.eth_usd);
-}
 
 function updatePriceBasedOnChainId(
   row: {

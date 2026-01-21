@@ -1,4 +1,11 @@
+import { desc } from "drizzle-orm";
+import offchainDatabase from "../../offchain.database";
+import { priceTable } from "../../offchain.schema";
+
 type Currency = "eth" | "degen";
+type PriceRow = typeof priceTable.$inferSelect;
+
+let cachedPrice: PriceRow | null = null;
 
 export async function fetchPrice({ currency }: { currency: Currency }) {
   let retries = 5;
@@ -31,4 +38,42 @@ export function getCurrencyByChainId({
     return "degen";
   }
   return "eth";
+}
+
+export async function loadLatestPrice() {
+  cachedPrice = await getLatestPrice();
+  return cachedPrice;
+}
+
+export async function refreshLatestPrice() {
+  cachedPrice = await getLatestPrice();
+  return cachedPrice;
+}
+
+export function setPrice(price: PriceRow | null) {
+  cachedPrice = price;
+}
+
+export function getPrice() {
+  return cachedPrice;
+}
+
+export function priceBasedOnChainId(chainId: number) {
+  if (!cachedPrice) {
+    throw new Error("Price not loaded");
+  }
+
+  return chainId === 666666666
+    ? Number(cachedPrice.degen_usd)
+    : Number(cachedPrice.eth_usd);
+}
+
+export async function getLatestPrice() {
+  const [price] = await offchainDatabase
+    .select()
+    .from(priceTable)
+    .orderBy(desc(priceTable.id))
+    .limit(1);
+
+  return price ?? null;
 }

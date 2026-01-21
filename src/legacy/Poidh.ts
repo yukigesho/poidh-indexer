@@ -9,15 +9,18 @@ import {
 } from "ponder:schema";
 import { formatEther } from "viem";
 import { sql } from "ponder";
-import offchainDatabase from "../../offchain.database";
-import { priceTable } from "../../offchain.schema";
 import {
   getFarcasterFids,
   getDisplayName,
   sendNotification,
 } from "../helpers/notifications";
-import { getCurrencyByChainId } from "../helpers/price";
-import { desc } from "drizzle-orm";
+import {
+  getCurrencyByChainId,
+  loadLatestPrice,
+  priceBasedOnChainId,
+} from "../helpers/price";
+import offchainDatabase from "../../offchain.database";
+import { bountyExtraTable } from "../../offchain.schema";
 
 const POIDH_BASE_URL = "https://poidh.xyz";
 
@@ -28,11 +31,7 @@ function isLive(block: bigint) {
   return nowSec - block <= maxDrift;
 }
 
-const [price] = await offchainDatabase
-  .select()
-  .from(priceTable)
-  .orderBy(desc(priceTable.id))
-  .limit(1);
+await loadLatestPrice();
 
 ponder.on("LegacyPoidhContract:BountyCreated", async ({ event, context }) => {
   const database = context.db;
@@ -56,12 +55,9 @@ ponder.on("LegacyPoidhContract:BountyCreated", async ({ event, context }) => {
     )[0].length > 0;
 
   const amountSort =
-    Number(formatEther(amount)) *
-    (context.chain.id === 666666666
-      ? Number(price!.degen_usd)
-      : Number(price!.eth_usd));
+    Number(formatEther(amount)) * priceBasedOnChainId(context.chain.id);
 
-  await database.insert(bounties).values({
+  const bounty = await database.insert(bounties).values({
     id: Number(id),
     onChainId: Number(id),
     chainId: context.chain.id,
@@ -74,6 +70,20 @@ ponder.on("LegacyPoidhContract:BountyCreated", async ({ event, context }) => {
     isMultiplayer,
     isCanceled: true,
   });
+
+  await offchainDatabase
+    .insert(bountyExtraTable)
+    .values({
+      bounty_id: bounty.id,
+      chain_id: context.chain.id,
+      amount_sort: amountSort,
+    })
+    .onConflictDoUpdate({
+      target: [bountyExtraTable.bounty_id, bountyExtraTable.chain_id],
+      set: {
+        amount_sort: amountSort,
+      },
+    });
 
   await database.insert(participationsBounties).values({
     userAddress: issuer,
@@ -148,11 +158,6 @@ ponder.on("LegacyPoidhContract:BountyJoined", async ({ event, context }) => {
     .set((raw) => ({
       amount: (BigInt(raw.amount) + amount).toString(),
       isJoinedBounty: true,
-      amountSort:
-        Number(formatEther(BigInt(raw.amount) + amount)) *
-        (context.chain.id === 666666666
-          ? Number(price!.degen_usd)
-          : Number(price!.eth_usd)),
     }));
 
   await database.insert(participationsBounties).values({
@@ -174,23 +179,36 @@ ponder.on("LegacyPoidhContract:BountyJoined", async ({ event, context }) => {
     timestamp,
   });
 
+  const updatedAmountSort =
+    Number(formatEther(BigInt(updatedBounty.amount))) *
+    priceBasedOnChainId(context.chain.id);
+
+  const joinedAmountUsd =
+    Number(formatEther(BigInt(amount))) * priceBasedOnChainId(context.chain.id);
+
+  await offchainDatabase
+    .insert(bountyExtraTable)
+    .values({
+      bounty_id: updatedBounty.id,
+      chain_id: context.chain.id,
+      amount_sort: updatedAmountSort,
+    })
+    .onConflictDoUpdate({
+      target: [bountyExtraTable.bounty_id, bountyExtraTable.chain_id],
+      set: {
+        amount_sort: updatedAmountSort,
+      },
+    });
+
   if (isLive(event.block.timestamp)) {
-    const joinedAmountUsd =
-      Number(formatEther(BigInt(amount))) *
-      (context.chain.id === 666666666
-        ? Number(price!.degen_usd)
-        : Number(price!.eth_usd));
-    if (
-      updatedBounty.amountSort >= 100 &&
-      updatedBounty.amountSort - joinedAmountUsd < 100
-    ) {
+    if (updatedAmountSort >= 100 && updatedAmountSort - joinedAmountUsd < 100) {
       const creatorName = await getDisplayName(updatedBounty.issuer);
       await sendNotification({
-        title: `💰 NEW $${updatedBounty.amountSort.toFixed(0)} BOUNTY 💰`,
+        title: `💰 NEW $${updatedAmountSort.toFixed(0)} BOUNTY 💰`,
         messageBody: `${updatedBounty.title}${
           creatorName ? ` from ${creatorName}` : ""
         }`,
-        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/bounty/${updatedBounty.id}`,
+        targetUrl: `${POIDH_BASE_URL}/${context.chain.name}/updatedBounty/${updatedBounty.id}`,
       });
     }
 
@@ -231,18 +249,13 @@ ponder.on(
     const { hash, transactionIndex } = event.transaction;
     const { timestamp } = event.block;
 
-    await database
+    const bounty = await database
       .update(bounties, {
         id: Number(bountyId),
         chainId: context.chain.id,
       })
       .set((raw) => ({
         amount: (BigInt(raw.amount) - amount).toString(),
-        amountSort:
-          Number(formatEther(BigInt(raw.amount) - amount)) *
-          (context.chain.id === 666666666
-            ? Number(price!.degen_usd)
-            : Number(price!.eth_usd)),
       }));
 
     await database.delete(participationsBounties, {
@@ -262,6 +275,23 @@ ponder.on(
       chainId: context.chain.id,
       timestamp,
     });
+
+    const amountSort =
+      Number(formatEther(amount)) * priceBasedOnChainId(context.chain.id);
+
+    await offchainDatabase
+      .insert(bountyExtraTable)
+      .values({
+        bounty_id: bounty.id,
+        chain_id: context.chain.id,
+        amount_sort: amountSort,
+      })
+      .onConflictDoUpdate({
+        target: [bountyExtraTable.bounty_id, bountyExtraTable.chain_id],
+        set: {
+          amount_sort: amountSort,
+        },
+      });
   },
 );
 
