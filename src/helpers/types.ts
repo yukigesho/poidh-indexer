@@ -24,6 +24,19 @@ export type BountyWithParticipantsData =
     participants: Address[];
   };
 
+export type WithdrawalAmountsData = {
+  withdrawalAmountDegen: number | null;
+  withdrawalAmountBase: number | null;
+  withdrawalAmountArbitrum: number | null;
+};
+
+export type WithdrawIssuerData = {
+  address: Address;
+  amountCrypto: string;
+  amountUSD: number;
+  withdrawalAmounts: WithdrawalAmountsData;
+};
+
 export type ClaimEventData = {
   id: number;
   chainId: number;
@@ -44,7 +57,8 @@ export type BountyCreatedEventData =
 export type BountyJoinedEventData = {
   participant: {
     address: Address;
-    amount: number;
+    amountCrypto: string;
+    amountUSD: number;
   };
   bounty: BountyWithParticipantsData;
 };
@@ -57,6 +71,20 @@ export type ClaimCreatedEventData = {
 export type ClaimAcceptedEventData = {
   bounty: BountyWithParticipantsData;
   claim: ClaimEventData;
+};
+
+export type WithdrawFromOpenBountyEventData = {
+  issuer: WithdrawIssuerData;
+  bounty: BountyWithParticipantsData;
+};
+
+export type WithdrawalEventData = {
+  issuer: WithdrawIssuerData;
+};
+
+export type WithdrawalToEventData = {
+  to: Address;
+  issuer: WithdrawIssuerData;
 };
 
 export type VotingStartedEventData = {
@@ -81,6 +109,18 @@ export type NotificationEventPayload =
   | {
       event: "ClaimAccepted";
       data: ClaimAcceptedEventData;
+    }
+  | {
+      event: "WithdrawFromOpenBounty";
+      data: WithdrawFromOpenBountyEventData;
+    }
+  | {
+      event: "Withdrawal";
+      data: WithdrawalEventData;
+    }
+  | {
+      event: "WithdrawalTo";
+      data: WithdrawalToEventData;
     }
   | {
       event: "VotingStarted";

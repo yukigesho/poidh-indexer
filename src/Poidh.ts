@@ -297,7 +297,8 @@ ponder.on(
         data: {
           participant: {
             address: participant,
-            amount:
+            amountCrypto: amount.toString(),
+            amountUSD:
               Number(formatEther(amount)) *
               priceBasedOnChainId(chainId),
           },
@@ -407,6 +408,69 @@ ponder.on(
           amount,
         ),
       );
+
+    if (isLive(event.block.timestamp)) {
+      const currency = getCurrencyByChainId({
+        chainId,
+      });
+      const participants =
+        await database.sql.query.participationsBounties.findMany(
+          {
+            where: (table, { and, eq, ne }) =>
+              and(
+                eq(table.bountyId, bounty.id),
+                eq(table.chainId, chainId),
+                ne(
+                  table.userAddress,
+                  participant,
+                ),
+              ),
+            columns: {
+              userAddress: true,
+            },
+            orderBy: (table) => table.amount,
+          },
+        );
+
+      const user = await database.find(users, {
+        address: participant,
+      });
+      const withdrawIssuer = {
+        address: participant,
+        amountCrypto: amount.toString(),
+        amountUSD:
+          Number(formatEther(amount)) *
+          priceBasedOnChainId(chainId),
+        withdrawalAmounts:
+          getWithdrawalAmounts(user),
+      };
+
+      await emitEvent({
+        event: "WithdrawFromOpenBounty",
+        data: {
+          issuer: withdrawIssuer,
+          bounty: {
+            ...bounty,
+            amountUSD: amountSort,
+            amountCrypto: bounty.amount,
+            createdAt: Number(bounty.createdAt),
+            inProgress:
+              bounty.inProgress ?? false,
+            isJoinedBounty:
+              bounty.isJoinedBounty ?? false,
+            isCanceled:
+              bounty.isCanceled ?? false,
+            isMultiplayer:
+              bounty.isMultiplayer ?? false,
+            isVoting: bounty.isVoting ?? false,
+            participants: participants.map(
+              (p) => p.userAddress,
+            ),
+            currency,
+          },
+        },
+      });
+    }
   },
 );
 
@@ -960,11 +1024,11 @@ ponder.on(
 ponder.on(
   "PoidhContract:Withdrawal",
   async ({ event, context }) => {
-    const { user } = event.args;
+    const { user, amount } = event.args;
     const chainId = context.chain.id;
     const database = context.db;
 
-    await database
+    const userRecord = await database
       .insert(users)
       .values({
         address: user,
@@ -973,17 +1037,34 @@ ponder.on(
       .onConflictDoUpdate(
         withdrawBasedOnChainId(chainId),
       );
+
+    if (isLive(event.block.timestamp)) {
+      await emitEvent({
+        event: "Withdrawal",
+        data: {
+          issuer: {
+            address: user,
+            amountCrypto: amount.toString(),
+            amountUSD:
+              Number(formatEther(amount)) *
+              priceBasedOnChainId(chainId),
+            withdrawalAmounts:
+              getWithdrawalAmounts(userRecord),
+          },
+        },
+      });
+    }
   },
 );
 
 ponder.on(
   "PoidhContract:WithdrawalTo",
   async ({ event, context }) => {
-    const { to } = event.args;
+    const { to, user, amount } = event.args;
     const chainId = context.chain.id;
     const database = context.db;
 
-    await database
+    const userRecord = await database
       .insert(users)
       .values({
         address: to,
@@ -992,6 +1073,24 @@ ponder.on(
       .onConflictDoUpdate(
         withdrawBasedOnChainId(chainId),
       );
+
+    if (isLive(event.block.timestamp)) {
+      await emitEvent({
+        event: "WithdrawalTo",
+        data: {
+          to,
+          issuer: {
+            address: user,
+            amountCrypto: amount.toString(),
+            amountUSD:
+              Number(formatEther(amount)) *
+              priceBasedOnChainId(chainId),
+            withdrawalAmounts:
+              getWithdrawalAmounts(userRecord),
+          },
+        },
+      });
+    }
   },
 );
 
@@ -1045,6 +1144,23 @@ function withdrawBasedOnChainId(
   }
   return {
     withdrawalAmountArbitrum: 0,
+  };
+}
+
+function getWithdrawalAmounts(
+  user: {
+    withdrawalAmountDegen: number | null;
+    withdrawalAmountBase: number | null;
+    withdrawalAmountArbitrum: number | null;
+  } | null,
+) {
+  return {
+    withdrawalAmountDegen:
+      user?.withdrawalAmountDegen ?? null,
+    withdrawalAmountBase:
+      user?.withdrawalAmountBase ?? null,
+    withdrawalAmountArbitrum:
+      user?.withdrawalAmountArbitrum ?? null,
   };
 }
 
