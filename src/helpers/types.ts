@@ -4,9 +4,10 @@ export type BountyBaseData = {
   id: number;
   chainId: number;
   onChainId: number;
+  amountUSD: number;
+  amountCrypto: string;
   title: string;
   description: string;
-  amount: number;
   issuer: Address;
   createdAt: number;
   inProgress: boolean;
@@ -18,9 +19,10 @@ export type BountyBaseData = {
   currency: string;
 };
 
-export type BountyWithParticipantsData = BountyBaseData & {
-  participants: Address[];
-};
+export type BountyWithParticipantsData =
+  BountyBaseData & {
+    participants: Address[];
+  };
 
 export type ClaimEventData = {
   id: number;
@@ -36,7 +38,8 @@ export type ClaimEventData = {
   isAccepted: boolean;
 };
 
-export type BountyCreatedEventData = BountyBaseData;
+export type BountyCreatedEventData =
+  BountyBaseData;
 
 export type BountyJoinedEventData = {
   participant: {
