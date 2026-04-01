@@ -789,7 +789,7 @@ ponder.on(
   "PoidhContract:VotingResolved",
   async ({ event, context }) => {
     const database = context.db;
-    const { bountyId, passed } = event.args;
+    const { bountyId, claimId, passed } = event.args;
     const { hash, transactionIndex } =
       event.transaction;
     const { timestamp } = event.block;
@@ -815,6 +815,7 @@ ponder.on(
       tx: hash,
       address: "0x0",
       bountyId: newBountyId,
+      claimId,
       action: "voting reset period",
       chainId,
       timestamp,
