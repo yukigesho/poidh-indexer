@@ -19,10 +19,9 @@ export type BountyBaseData = {
   currency: string;
 };
 
-export type BountyWithParticipantsData =
-  BountyBaseData & {
-    participants: Address[];
-  };
+export type BountyWithParticipantsData = BountyBaseData & {
+  participants: Address[];
+};
 
 export type WithdrawalAmountsData = {
   withdrawalAmountDegen: number | null;
@@ -51,8 +50,7 @@ export type ClaimEventData = {
   isAccepted: boolean;
 };
 
-export type BountyCreatedEventData =
-  BountyBaseData;
+export type BountyCreatedEventData = BountyBaseData;
 
 export type BountyJoinedEventData = {
   participant: {
@@ -93,6 +91,17 @@ export type VotingStartedEventData = {
   otherClaimers: Address[];
 };
 
+export type VotingResolvedEventData = {
+  bounty: BountyWithParticipantsData;
+  claim: ClaimEventData;
+  voting: {
+    passed: boolean;
+    yes: string;
+    no: string;
+    round: string;
+  };
+};
+
 export type NotificationEventPayload =
   | {
       event: "BountyCreated";
@@ -125,4 +134,8 @@ export type NotificationEventPayload =
   | {
       event: "VotingStarted";
       data: VotingStartedEventData;
+    }
+  | {
+      event: "VotingResolved";
+      data: VotingResolvedEventData;
     };
