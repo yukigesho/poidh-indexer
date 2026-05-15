@@ -907,6 +907,7 @@ function updatePriceBasedOnChainId(
     withdrawalAmountDegen: number | null;
     withdrawalAmountBase: number | null;
     withdrawalAmountArbitrum: number | null;
+    withdrawalAmountMainnet: number | null;
   } | null,
   chainId: ChainId,
   payout: bigint,
@@ -921,6 +922,12 @@ function updatePriceBasedOnChainId(
   if (chainId === 666666666) {
     return {
       withdrawalAmountDegen: (row?.withdrawalAmountDegen ?? 0) + amountParsed,
+    };
+  }
+  if (chainId === 1) {
+    return {
+      withdrawalAmountMainnet:
+        (row?.withdrawalAmountMainnet ?? 0) + amountParsed,
     };
   }
   return {
@@ -940,6 +947,11 @@ function withdrawBasedOnChainId(chainId: ChainId) {
       withdrawalAmountDegen: 0,
     };
   }
+  if (chainId === 1) {
+    return {
+      withdrawalAmountMainnet: 0,
+    };
+  }
   return {
     withdrawalAmountArbitrum: 0,
   };
@@ -950,12 +962,14 @@ function getWithdrawalAmounts(
     withdrawalAmountDegen: number | null;
     withdrawalAmountBase: number | null;
     withdrawalAmountArbitrum: number | null;
+    withdrawalAmountMainnet: number | null;
   } | null,
 ) {
   return {
     withdrawalAmountDegen: user?.withdrawalAmountDegen ?? null,
     withdrawalAmountBase: user?.withdrawalAmountBase ?? null,
     withdrawalAmountArbitrum: user?.withdrawalAmountArbitrum ?? null,
+    withdrawalAmountMainnet: user?.withdrawalAmountMainnet ?? null,
   };
 }
 
