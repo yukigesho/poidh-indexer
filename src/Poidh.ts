@@ -829,9 +829,23 @@ ponder.on("PoidhContract:VoteCast", async ({ event, context }) => {
 });
 
 ponder.on("PoidhContract:RefundClaimed", async ({ event, context }) => {
-  const { amount, participant } = event.args;
+  const { amount, participant, bountyId } = event.args;
+  const { transactionIndex, hash } = event.transaction;
+  const { timestamp } = event.block;
   const chainId = context.chain.id;
   const database = context.db;
+
+  const newBountyId = LATEST_BOUNTIES_INDEX[chainId] + Number(bountyId);
+
+  await database.insert(transactions).values({
+    index: transactionIndex,
+    tx: hash,
+    address: participant,
+    bountyId: newBountyId,
+    action: `funds claimed`,
+    chainId,
+    timestamp,
+  });
 
   await database
     .insert(users)
