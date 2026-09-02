@@ -39,6 +39,7 @@ export default createConfig({
         degen: {
           address: "0x18e5585ca7ce31b90bc8bb7aaf84152857ce243f",
           startBlock: 26638629,
+          endBlock: 26987932,
         },
         arbitrum: {
           address: "0x5555fa783936c260f77385b4e153b9725fef1719",
@@ -61,6 +62,7 @@ export default createConfig({
         degen: {
           address: "0x39f04b7897dcaf9dc454e433f43fb1c3bb528e11",
           startBlock: 26638628,
+          endBlock: 26987932,
         },
         arbitrum: {
           address: "0x27E117Cc9A8DA363442e7Bd0618939E3EEEACF6A",
