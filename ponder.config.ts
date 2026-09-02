@@ -15,10 +15,10 @@ export default createConfig({
       id: 8453,
       rpc: http(process.env.BASE_RPC_URL),
     },
-    degen: {
-      id: 666666666,
-      rpc: http(process.env.DEGEN_RPC_URL),
-    },
+    // degen: {
+    //   id: 666666666,
+    //   rpc: http(process.env.DEGEN_RPC_URL),
+    // },
     arbitrum: {
       id: 42161,
       rpc: http(process.env.ARBITRUM_RPC_URL),
@@ -36,11 +36,11 @@ export default createConfig({
           address: "0x5555fa783936c260f77385b4e153b9725fef1719",
           startBlock: 41026079,
         },
-        degen: {
-          address: "0x18e5585ca7ce31b90bc8bb7aaf84152857ce243f",
-          startBlock: 26638629,
-          endBlock: 26987932,
-        },
+        // degen: {
+        //   address: "0x18e5585ca7ce31b90bc8bb7aaf84152857ce243f",
+        //   startBlock: 26638629,
+        //   endBlock: 26987932,
+        // },
         arbitrum: {
           address: "0x5555fa783936c260f77385b4e153b9725fef1719",
           startBlock: 423059298,
@@ -59,11 +59,11 @@ export default createConfig({
           address: "0x27E117Cc9A8DA363442e7Bd0618939E3EEEACF6A",
           startBlock: 41026079,
         },
-        degen: {
-          address: "0x39f04b7897dcaf9dc454e433f43fb1c3bb528e11",
-          startBlock: 26638628,
-          endBlock: 26987932,
-        },
+        // degen: {
+        //   address: "0x39f04b7897dcaf9dc454e433f43fb1c3bb528e11",
+        //   startBlock: 26638628,
+        //   endBlock: 26987932,
+        // },
         arbitrum: {
           address: "0x27E117Cc9A8DA363442e7Bd0618939E3EEEACF6A",
           startBlock: 423059286,
@@ -83,11 +83,11 @@ export default createConfig({
           startBlock: 14542727,
           endBlock: 39265657,
         },
-        degen: {
-          address: "0x2445BfFc6aB9EEc6C562f8D7EE325CddF1780814",
-          startBlock: 6991084,
-          endBlock: 26575631,
-        },
+        // degen: {
+        //   address: "0x2445BfFc6aB9EEc6C562f8D7EE325CddF1780814",
+        //   startBlock: 6991084,
+        //   endBlock: 26575631,
+        // },
         arbitrum: {
           address: "0x0Aa50ce0d724cc28f8F7aF4630c32377B4d5c27d",
           startBlock: 211898523,
@@ -104,11 +104,11 @@ export default createConfig({
           startBlock: 14542570,
           endBlock: 39565960,
         },
-        degen: {
-          address: "0xDdfb1A53E7b73Dba09f79FCA24765C593D447a80",
-          startBlock: 4857281,
-          endBlock: 26575168,
-        },
+        // degen: {
+        //   address: "0xDdfb1A53E7b73Dba09f79FCA24765C593D447a80",
+        //   startBlock: 4857281,
+        //   endBlock: 26575168,
+        // },
         arbitrum: {
           address: "0xDdfb1A53E7b73Dba09f79FCA24765C593D447a80",
           startBlock: 211898311,
