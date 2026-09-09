@@ -23,7 +23,7 @@
     "hono-openapi": "^1.1.2",
     "pg": "^8.16.3",
     "ponder": "^0.17.10",
-    "viem": "^2.44.2",
+    "viem": "^2.35.0",
     "zod": "^4.3.5",
     "zod-openapi": "^5.4.6"
   },
@@ -34,7 +34,7 @@
     "eslint": "^9.39.2",
     "eslint-config-ponder": "^0.17.10",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.4.0"
   },
   "engines": {
     "node": ">=18.14"
