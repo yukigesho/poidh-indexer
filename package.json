@@ -10,22 +10,15 @@
     "lint": "eslint .",
     "typecheck": "tsc",
     "update-price": "tsx ./src/cron/updatePrice.ts",
-    "generateAPIKey": "tsx ./scripts/generateAPI.ts",
     "redeploy": "railway redeploy"
   },
   "dependencies": {
-    "@hono/swagger-ui": "^0.5.3",
-    "@hono/zod-openapi": "^1.2.0",
-    "@hono/zod-validator": "^0.7.6",
     "dotenv": "^17.2.3",
     "drizzle-orm": "0.45.1",
     "hono": "^4.11.4",
-    "hono-openapi": "^1.1.2",
     "pg": "^8.16.3",
     "ponder": "^0.17.10",
-    "viem": "^2.35.0",
-    "zod": "^4.3.5",
-    "zod-openapi": "^5.4.6"
+    "viem": "^2.35.0"
   },
   "devDependencies": {
     "@railway/cli": "^4.23.2",
