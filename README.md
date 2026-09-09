@@ -1,8 +1,9 @@
 # POIDH Indexer
 
-Indexer + API service for [POIDH](https://github.com/picsoritdidnthappen/poidh-app) built with [Ponder](https://ponder.sh), [Hono](https://hono.dev), and PostgreSQL. It ingests on-chain Poidh bounty + NFT events across Base, Degen, and Arbitrum, keeps supplemental USD pricing off-chain, and exposes queryable REST and GraphQL surfaces for the app.
+Indexer + API service for [POIDH](https://github.com/picsoritdidnthappen/poidh-app) built with [Ponder](https://ponder.sh), [Hono](https://hono.dev), and PostgreSQL. It ingests on-chain Poidh bounty + NFT events across Base, Arbitrum, and Ethereum mainnet, keeps supplemental USD pricing off-chain, and exposes queryable REST and GraphQL surfaces for the app.
 
 ## Table of contents
+
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [Requirements](#requirements)
@@ -24,12 +25,14 @@ Indexer + API service for [POIDH](https://github.com/picsoritdidnthappen/poidh-a
 - [License](#license)
 
 ## Overview
+
 - Mirrors Poidh bounty, claim, participation, transaction, user, leaderboard, and NFT transfer data into Postgres via Ponder handlers.
 - Maintains an off-chain USD price table (ETH + DEGEN) so bounties can be sorted by fiat value.
 - Serves REST + OpenAPI + Swagger + GraphQL APIs for the Poidh client and external consumers.
 - Includes cron + webhook workflows for refreshing prices and optional Neynar-powered notifications.
 
 ## Architecture
+
 1. **Indexer** (`src/Poidh.ts`, `src/PoidhNFT.ts`): Ponder event handlers read chain events and populate tables defined in `ponder.schema.ts`.
 2. **API** (`src/api`): A Hono app mounts REST resources, OpenAPI docs, Swagger UI, and wires `/graphql` via Ponder's helper.
 3. **Off-chain storage** (`offchain.database.ts`, `offchain.schema.ts`): Drizzle ORM keeps historical USD pricing in a lightweight `Price` table.
@@ -41,6 +44,7 @@ Chain events → Ponder handlers → Postgres tables → REST/GraphQL/OpenAPI �
 ```
 
 ## Requirements
+
 - Node.js >= 18.14
 - [pnpm](https://pnpm.io/) 8+
 - PostgreSQL 14+ reachable via `DATABASE_URL`
@@ -50,20 +54,22 @@ Chain events → Ponder handlers → Postgres tables → REST/GraphQL/OpenAPI �
 ## Setup
 
 ### Environment variables
-Create `.env.local` (or `.env`) in the repo root.
+
+Copy `.env.local.example` to `.env` (or `.env.local`) in the repo root. Existing environment variables and Ponder's `.env.local` values take precedence over `.env`.
 
 | Variable | Required | Description |
 | --- | --- | --- |
 | `DATABASE_URL` | ✅ | Postgres connection string, e.g. `postgresql://user:pass@host:5432/db` |
 | `DATABASE_SCHEMA` | ✅ | Schema that stores Ponder + off-chain tables (use `public` or custom) |
-| `BASE_RPC_URL` | ✅ | Base mainnet RPC URL |
-| `DEGEN_RPC_URL` | ✅ | Degen chain RPC URL (e.g. `https://rpc.degen.tips`) |
-| `ARBITRUM_RPC_URL` | ✅ | Arbitrum One RPC URL |
+| `ERPC_URL` | ✅ | eRPC origin, e.g. `https://YOUR-ERPC-DOMAIN` or `http://erpc.railway.internal:4000` on Railway's private network; no path suffix |
+| `ERPC_AUTH_SECRET` | ✅ | Must match the eRPC service's secret; sent as `X-ERPC-Secret-Token` |
 | `SERVER_API_KEY` | ✅ | Shared key for `/updatePrice` |
 | `SERVER_SECRET` | ✅ | HMAC secret used to sign `/updatePrice` requests |
 | `RAILWAY_TOKEN` | ✅ (prod) | Railway token for automated redeploys |
 | `RAILWAY_SERVICE_ID` | ✅ (prod) | Railway service identifier |
 | `NEYNAR_API_KEY` | optional | Enables Farcaster notification helpers |
+
+All chain RPC requests use `${ERPC_URL}/main/evm/<chainId>` with secret-token authentication (including private-network requests). The old per-chain `*_RPC_URL` variables are no longer used. Keep the eRPC secret server-side and out of Git. Degen is no longer indexed; historical Degen database fields are retained for compatibility.
 
 Generate API creds via:
 
@@ -72,16 +78,19 @@ pnpm generateAPIKey
 ```
 
 ### Install dependencies
+
 ```bash
 pnpm install
 ```
 
 ### Database
+
 - Ensure the schema in `DATABASE_SCHEMA` exists and the user has DDL permissions.
 - Ponder creates `ponder_*` tables automatically; the Drizzle `Price` table is created when the first price row is inserted.
 - For local Postgres you can use tools like `psql` or Docker; just make sure `DATABASE_URL` works for both the indexer and API.
 
 ## Running locally
+
 ```bash
 pnpm dev        # Ponder dev server + Hono API (default http://localhost:42069)
 pnpm start      # Production start (after `ponder build`)
@@ -93,6 +102,7 @@ pnpm typecheck  # tsc --noEmit
 Ponder exposes `/graphql`, `/openapi/doc`, and `/swagger` while running.
 
 ## Keeping the price feed fresh
+
 1. **Cron script**: `pnpm update-price` hits Coinbase for ETH + DEGEN USD rates and inserts rows when either price moves >= 3% since the last stored value.
 2. **Webhook**: `POST /updatePrice` performs the same work but requires API headers and, on success, shells out to `pnpm redeploy --service <SERVICE_ID>` so Railway restarts the service.
 3. Schedule either mechanism (e.g. every 5 minutes) so `amountSort` stays current.
@@ -100,6 +110,7 @@ Ponder exposes `/graphql`, `/openapi/doc`, and `/swagger` while running.
 ## API surface
 
 ### REST endpoints
+
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/bounty/:chainId` | All bounties for a chain |
@@ -117,6 +128,7 @@ Ponder exposes `/graphql`, `/openapi/doc`, and `/swagger` while running.
 | `POST` | `/updatePrice` | Authenticated price refresh + redeploy |
 
 ### GraphQL
+
 Use `/graphql` (see `generated/schema.graphql`). Example query:
 
 ```graphql
@@ -140,30 +152,35 @@ query LatestBounties($chainId: Int!) {
 ```
 
 ### OpenAPI / Swagger
+
 - `GET /openapi/doc` provides machine-readable docs (schemas live in `src/openapi`).
 - `GET /swagger` serves a UI via `@hono/swagger-ui` for testing endpoints manually.
 
 ### Authenticated price refresh endpoint
+
 Headers required when calling `POST /updatePrice`:
 
 | Header | Purpose |
 | --- | --- |
 | `x-api-key` | Must equal `SERVER_API_KEY` |
 | `x-timestamp` | Unix seconds; request expires after 5 minutes |
-| `x-signature` | Hex HMAC-SHA256 of `METHOD|PATH|timestamp|body` using `SERVER_SECRET` |
+| `x-signature` | Hex HMAC-SHA256 of `METHOD | PATH | timestamp | body` using `SERVER_SECRET` |
 
 If validation passes and the price delta threshold is met, the new prices are inserted and the Railway redeploy command runs.
 
 ## Tracked contracts
+
+The table below lists legacy deployments. Current V3 deployments on Base, Arbitrum, and Ethereum mainnet, along with legacy end blocks, are defined in `ponder.config.ts`.
+
 | Chain | ID | Poidh contract | Start block | NFT contract | Start block |
 | --- | --- | --- | --- | --- | --- |
 | Base | 8453 | `0xb502c5856F7244DccDd0264A541Cc25675353D39` | 14,542,727 | `0xDdfb1A53E7b73Dba09f79FCA24765C593D447a80` | 14,542,570 |
-| Degen | 666666666 | `0x2445BfFc6aB9EEc6C562f8D7EE325CddF1780814` | 6,991,084 | `0xDdfb1A53E7b73Dba09f79FCA24765C593D447a80` | 4,857,281 |
 | Arbitrum | 42161 | `0x0Aa50ce0d724cc28f8F7aF4630c32377B4d5c27d` | 211,898,523 | `0xDdfb1A53E7b73Dba09f79FCA24765C593D447a80` | 211,898,311 |
 
 Update `ponder.config.ts` if you need to change addresses or rewind history.
 
 ## Scripts
+
 | Command | Description |
 | --- | --- |
 | `pnpm dev` | Run indexers + API locally with hot reload |
@@ -176,12 +193,14 @@ Update `ponder.config.ts` if you need to change addresses or rewind history.
 | `pnpm redeploy` | Railway redeploy helper (needs `RAILWAY_TOKEN`) |
 
 ## Deployment notes
+
 - The dev server binds to `0.0.0.0:42069` by default; configure via Ponder env vars as needed.
 - `/updatePrice` expects Railway creds; adapt the command if you deploy elsewhere.
 - Neynar notifications stay disabled unless `NEYNAR_API_KEY` is set; integration lives in `src/helpers/notifications.ts`.
 - Remember to run `pnpm codegen` whenever `ponder.schema.ts` changes so types stay aligned.
 
 ## Troubleshooting
+
 - **Database connection errors**: Verify `DATABASE_URL` + `DATABASE_SCHEMA` and that the user has permission to create tables.
 - **Missing events**: Use archive RPC URLs and confirm `ponder.config.ts` start blocks cover the history you need.
 - **USD sort stuck at zero**: Run `pnpm update-price` once to seed the table; make sure Coinbase responses include USD rates.
@@ -189,4 +208,5 @@ Update `ponder.config.ts` if you need to change addresses or rewind history.
 - **Swagger showing static data**: Those are examples; hit the REST endpoints directly for live data.
 
 ## License
+
 [MIT](LICENSE)

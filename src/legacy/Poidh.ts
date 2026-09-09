@@ -172,9 +172,7 @@ ponder.on("LegacyPoidhContract:BountyJoined", async ({ event, context }) => {
     tx: hash,
     address: participant,
     bountyId: Number(bountyId),
-    action: `+${formatEther(amount)} ${
-      context.chain.name === "degen" ? "degen" : "eth"
-    }`,
+    action: `+${formatEther(amount)} eth`,
     chainId: context.chain.id,
     timestamp,
   });
@@ -269,9 +267,7 @@ ponder.on(
       tx: hash,
       address: participant,
       bountyId: Number(bountyId),
-      action: `-${formatEther(amount)} ${
-        context.chain.name === "degen" ? "degen" : "eth"
-      }`,
+      action: `-${formatEther(amount)} eth`,
       chainId: context.chain.id,
       timestamp,
     });
