@@ -1,31 +1,19 @@
 import dotenv from "dotenv";
 import * as offchainSchema from "./offchain.schema";
-import { drizzle, NodePgDatabase } from "drizzle-orm/node-postgres";
-import { Client } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 import fs from "fs";
+import { createOffchainPool } from "./src/helpers/offchainPool";
 
 fs.existsSync(".env")
   ? dotenv.config({ path: ".env" })
   : dotenv.config({ path: ".env.local" });
 
-let database: NodePgDatabase<typeof offchainSchema> | null = null;
-
-async function createDatabaseConnection() {
-  if (database) {
-    return database;
-  }
-
-  const client = new Client({
-    connectionString: `${process.env.DATABASE_URL}?schema=${process.env.DATABASE_SCHEMA}`,
-  });
-
-  await client.connect();
-
-  database = drizzle(client, {
-    schema: offchainSchema,
-  });
-
-  return database;
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DATABASE_URL must be set");
 }
 
-export default await createDatabaseConnection();
+// Preserve URL options (SSL, etc.). offchain.schema.ts qualifies table names.
+const pool = createOffchainPool(connectionString);
+
+export default drizzle(pool, { schema: offchainSchema });

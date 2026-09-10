@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { createConfig } from "ponder";
-import { http } from "viem";
+import { createErpcTransport } from "./src/helpers/erpc";
 import PoidhV2ABI from "./abis/PoidhV2Abi";
 import PoidhV2NFTABI from "./abis/PoidhV2NFTAbi";
 import { PoidhV3Abi } from "./abis/PoidhV3";
@@ -13,18 +13,8 @@ if (!erpcUrl || !erpcSecret?.trim()) {
   throw new Error("ERPC_URL and ERPC_AUTH_SECRET must be set");
 }
 
-const erpcHeaders = { "X-ERPC-Secret-Token": erpcSecret };
-
-function erpcTransport(chainId: number) {
-  return http(`${erpcUrl}/main/evm/${chainId}`, {
-    fetchOptions: {
-      headers: erpcHeaders,
-    },
-    // eRPC handles retries within its 30-second request budget.
-    timeout: 35_000,
-    retryCount: 0,
-  });
-}
+const erpcTransport = (chainId: number) =>
+  createErpcTransport(`${erpcUrl}/main/evm/${chainId}`, erpcSecret);
 
 export default createConfig({
   ordering: "multichain",

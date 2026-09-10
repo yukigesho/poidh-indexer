@@ -9,6 +9,7 @@
     "codegen": "ponder codegen",
     "lint": "eslint .",
     "typecheck": "tsc",
+    "test": "tsx --test scripts/*.test.ts",
     "update-price": "tsx ./src/cron/updatePrice.ts",
     "redeploy": "railway redeploy"
   },
