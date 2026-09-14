@@ -72,6 +72,32 @@ The sibling `../erpc` monitoring stack now scrapes `indexer.railway.internal:420
 pnpm start --schema=$RAILWAY_DEPLOYMENT_ID --views-schema=public --hostname :: --port 42069
 ```
 
+`pnpm start` runs `scripts/start.mjs`, which forwards these arguments to Ponder.
+When `RAILWAY_DEPLOYMENT_ID` is set, the wrapper polls the container's local
+`/ready` endpoint every five seconds. After historical indexing completes, it
+copies the 582 user wallets from `historical.degenscores` into that deployment's
+`Leaderboard` with `chain_id = 666666666`, mapping `paid`, `earned`, and `nfts`
+directly. The source table must already exist in the same database; the database
+role needs SELECT access there and INSERT/UPDATE access on the destination.
+
+The copy is transactional and uses an absolute-value upsert, so restarts cannot
+double-count scores. Import failures retry up to 12 times, five seconds apart;
+exhaustion stops Ponder with a nonzero wrapper exit status. Configure Railway's
+restart policy to restart failed deployments. Ponder exit status is propagated,
+and SIGTERM/SIGINT are forwarded (with forced shutdown after ten seconds).
+Without `RAILWAY_DEPLOYMENT_ID`, Ponder starts normally without a Degen import.
+An explicit `--schema` must match the deployment ID; otherwise the wrapper fails
+before starting Ponder. If omitted, the wrapper supplies the deployment schema.
+
+The wrapper does not alter public views or Ponder's readiness response. There
+can be a brief interval after `/ready` succeeds before Degen rows appear; confirm
+`Historical Degen leaderboard populated: 582 wallets` in deployment logs.
+This is an external write into a Ponder-managed table: Degen must remain absent
+from indexing handlers. Ponder's reorg triggers also track external writes, so
+a reorg or in-process table reset may remove these rows; restarting the wrapper
+reapplies the snapshot. The existing `real` destination columns retain
+their floating-point precision; the historical source uses exact `numeric`.
+
 Keep `DATABASE_SCHEMA=public` for off-chain tables. The CLI `--schema` selects Ponder's deployment-specific schema; `--views-schema=public` publishes its indexed tables through stable views for the REST API. Use one active writer per deployment schema. This preserves the existing deployment/views arrangement; no schema migration is introduced. Binding to `::` supports Railway private IPv6 networking and dual-stack IPv4 on the usual Linux setup. Keep operational endpoints private. Use `/ready` for the deployment healthcheck (up to 3600s for backfill), but remember Railway does not continuously poll it after deployment.
 
 Redeploy Prometheus after updating its config/image. In Grafana Explore, verify `up{job="ponder"} == 1` and chain labels `base`, `arbitrum`, and `main`. Useful Ponder 0.17.10 queries:
