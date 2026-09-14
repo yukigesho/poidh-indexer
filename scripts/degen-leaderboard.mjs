@@ -50,6 +50,11 @@ export async function copyDegenScores(client, schema) {
   await client.query("BEGIN");
   try {
     await client.query("SET LOCAL lock_timeout = '5s'");
+    // Ponder 0.17's live_query trigger expects this per-connection temp table.
+    // Match its own transaction setup without disabling any managed triggers.
+    await client.query(
+      "CREATE TEMP TABLE live_query_tables (table_name TEXT PRIMARY KEY) ON COMMIT DROP",
+    );
     const source = await client.query(
       "SELECT count(*)::integer AS count FROM historical.degenscores",
     );
@@ -74,6 +79,37 @@ export async function copyDegenScores(client, schema) {
   }
 }
 
+// Log only known diagnostics: connection errors can include credentials/URLs.
+export function describeCopyError(error) {
+  const descriptions = {
+    "42P01":
+      "Required table is missing (check source, destination, and Ponder trigger dependencies)",
+    42501: "Database role lacks required permissions",
+    "55P03": "Database lock timeout",
+    57014: "Database statement timeout or cancellation",
+    40001: "Serialization failure",
+    "40P01": "Database deadlock",
+    23505: "Unique constraint violation",
+    23502: "NOT NULL constraint violation",
+    "08006": "Database connection failure",
+    ECONNREFUSED: "Database connection refused",
+    ECONNRESET: "Database connection reset",
+    ENOTFOUND: "Database hostname could not be resolved",
+    ETIMEDOUT: "Database connection timed out",
+  };
+  const code = error?.code;
+  if (typeof code === "string" && /^[A-Z0-9_]{2,24}$/.test(code)) {
+    return `${code}: ${Object.hasOwn(descriptions, code) ? descriptions[code] : "Database error"}`;
+  }
+  if (
+    error?.message === "Expected 582 historical Degen wallets" ||
+    error?.message === "Unexpected Degen import count"
+  ) {
+    return error.message;
+  }
+  return "Import error (no safe database error code available)";
+}
+
 // Readiness is polled only on this container, never via a public/service URL.
 export async function waitAndCopy({
   ready,
@@ -93,9 +129,11 @@ export async function waitAndCopy({
       if (stopped()) return;
       log(`Historical Degen leaderboard populated: ${count} wallets`);
       return;
-    } catch {
+    } catch (error) {
       if (stopped()) return;
-      log(`Historical Degen copy failed (attempt ${attempt}/${maxAttempts})`);
+      log(
+        `Historical Degen copy failed (attempt ${attempt}/${maxAttempts}): ${describeCopyError(error)}`,
+      );
       if (attempt >= maxAttempts)
         throw new Error("Historical Degen copy exhausted retries");
       await sleep();

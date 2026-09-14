@@ -78,7 +78,13 @@ When `RAILWAY_DEPLOYMENT_ID` is set, the wrapper polls the container's local
 copies the 582 user wallets from `historical.degenscores` into that deployment's
 `Leaderboard` with `chain_id = 666666666`, mapping `paid`, `earned`, and `nfts`
 directly. The source table must already exist in the same database; the database
-role needs SELECT access there and INSERT/UPDATE access on the destination.
+role needs SELECT access there, INSERT/UPDATE access on the destination, access
+to tables/sequences used by Ponder's reorg trigger, and TEMP permission on the
+database. Each import transaction creates Ponder 0.17's session-local
+`live_query_tables` temporary table, required by the destination's `live_query`
+trigger. It is dropped on commit; no triggers are disabled. Recheck this
+compatibility setup when upgrading Ponder. Failure logs include safe database
+error codes and descriptions, not raw connection details.
 
 The copy is transactional and uses an absolute-value upsert, so restarts cannot
 double-count scores. Import failures retry up to 12 times, five seconds apart;

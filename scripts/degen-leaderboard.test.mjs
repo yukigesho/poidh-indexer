@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   copyDegenScores,
   deploymentSettings,
+  describeCopyError,
   waitAndCopy,
 } from "./degen-leaderboard.mjs";
 
@@ -57,6 +58,13 @@ function fakeClient({ count = 582, failInsert = false } = {}) {
       calls.push({ sql, params });
       if (sql.startsWith("SELECT count")) return { rows: [{ count }] };
       if (sql.includes("INSERT INTO")) {
+        assert.ok(
+          calls.some(
+            ({ sql: setup }) =>
+              setup ===
+              "CREATE TEMP TABLE live_query_tables (table_name TEXT PRIMARY KEY) ON COMMIT DROP",
+          ),
+        );
         if (failInsert) throw new Error("test database failure");
         return { rowCount: 582 };
       }
@@ -78,6 +86,26 @@ test("copy uses deployment table, chain parameter, and absolute upsert values", 
   assert.equal(client.calls.at(-1).sql, "COMMIT");
   await copyDegenScores(client, "deployment-123");
   assert.equal(client.calls.filter(({ sql }) => sql === "COMMIT").length, 2);
+});
+
+test("failure diagnostics include SQLSTATE but never raw connection details", () => {
+  const unsafe = "postgresql://user:secret@host/database";
+  assert.match(
+    describeCopyError({ code: "42P01", message: unsafe }),
+    /42P01: Required table is missing/,
+  );
+  assert.match(
+    describeCopyError({ code: "ECONNREFUSED", message: unsafe }),
+    /connection refused/,
+  );
+  assert.ok(!describeCopyError({ message: unsafe }).includes(unsafe));
+  assert.ok(
+    !describeCopyError({ code: unsafe, message: unsafe }).includes(unsafe),
+  );
+  assert.equal(
+    describeCopyError(new Error("Expected 582 historical Degen wallets")),
+    "Expected 582 historical Degen wallets",
+  );
 });
 
 test("invalid source and failed inserts roll back", async () => {
