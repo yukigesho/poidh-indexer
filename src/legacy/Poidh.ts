@@ -6,6 +6,7 @@ import {
   users,
   transactions,
   leaderboard,
+  votes,
 } from "ponder:schema";
 import { formatEther } from "viem";
 import { sql } from "ponder";
@@ -497,6 +498,18 @@ ponder.on(
     const { hash, transactionIndex } = event.transaction;
     const { timestamp } = event.block;
 
+    const [yes, no, deadline] = await client.readContract({
+      abi: contracts.LegacyPoidhContract.abi,
+      address: contracts.LegacyPoidhContract.address,
+      functionName: "bountyVotingTracker",
+      args: [bountyId],
+    });
+
+    // Legacy voting periods should never read as still open
+    const now = Math.floor(Date.now() / 1000);
+    const resolvedDeadline =
+      Number(deadline) > now ? now - 24 * 60 * 60 : Number(deadline);
+
     const updatedBounty = await database
       .update(bounties, {
         id: Number(bountyId),
@@ -504,6 +517,23 @@ ponder.on(
       })
       .set({
         isVoting: true,
+        deadline: resolvedDeadline,
+      });
+
+    await database
+      .insert(votes)
+      .values({
+        bountyId: Number(bountyId),
+        chainId: context.chain.id,
+        claimId: Number(claimId),
+        yes,
+        no,
+        round: 1,
+      })
+      .onConflictDoUpdate({
+        claimId: Number(claimId),
+        yes,
+        no,
       });
 
     await database.insert(transactions).values({
@@ -590,6 +620,28 @@ ponder.on("LegacyPoidhContract:VoteClaim", async ({ event, context }) => {
   const { client, contracts } = context;
   const { hash, transactionIndex } = event.transaction;
   const { timestamp } = event.block;
+
+  const [yes, no] = await client.readContract({
+    abi: contracts.LegacyPoidhContract.abi,
+    address: contracts.LegacyPoidhContract.address,
+    functionName: "bountyVotingTracker",
+    args: [bountyId],
+  });
+
+  await database
+    .insert(votes)
+    .values({
+      bountyId: Number(bountyId),
+      chainId: context.chain.id,
+      claimId: Number(claimId),
+      yes,
+      no,
+      round: 1,
+    })
+    .onConflictDoUpdate({
+      yes,
+      no,
+    });
 
   await database.insert(transactions).values({
     index: transactionIndex,
